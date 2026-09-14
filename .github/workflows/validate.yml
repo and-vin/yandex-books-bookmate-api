@@ -1,0 +1,22 @@
+name: Validate OpenAPI spec
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "openapi.yaml"
+      - ".github/workflows/validate.yml"
+  pull_request:
+    paths:
+      - "openapi.yaml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - run: pip install openapi-spec-validator
+      - run: python -m openapi_spec_validator openapi.yaml
