@@ -1,0 +1,2864 @@
+openapi: 3.0.3
+info:
+  title: Bookmate / Яндекс Книги — неофициальный REST API
+  version: "1.0.0"
+  description: |
+    Дополнение к [`API.md`](./API.md): авторизованные эндпоинты
+    (профиль, личная библиотека, полки, достижения, рецензии) и GraphQL.
+
+    Эндпоинты с `security: [AuthToken]` требуют заголовок
+    `Auth-Token: y0_AgAAAA...` — получение токена описано в
+    `components.securitySchemes.AuthToken`. `x-verified: true` +
+    `x-verified-date` — путь проверен живым запросом с реальным токеном.
+    `x-verified: false` — путь взят из независимых клиентов (в основном
+    `stepan163s/yandex-book-api`), не проверен. `/profile/reading_achievements`
+    отвечает `410`, `/profile/series/following` — `404`, вопреки
+    задокументированному в этих клиентах поведению.
+
+    Эндпоинты извлечения и расшифровки контента книг не формализованы —
+    см. `x-content-extraction-excluded` ниже.
+
+    Поля схем — из реального ответа API (сохранённых авторизованных и
+    анонимных ответов сервера) либо из независимых клиентов, когда живых
+    данных не было (помечено `x-source`).
+
+    Неофициальный API. Использование — на свой риск.
+
+tags:
+  - name: Анонимные
+    description: Поиск и публичные карточки — без токена
+  - name: Профиль
+    description: Профиль текущего пользователя и служебные эндпоинты
+  - name: Личная библиотека
+    description: Карточки книг в личной библиотеке
+  - name: Полки
+    description: Книжные полки
+  - name: Достижения и рецензии
+    description: Цитаты, рецензии, уведомления, достижения чтения
+  - name: Каталог
+    description: Дерево тем/жанров каталога
+
+x-content-extraction-excluded:
+  title: "Сознательно не формализовано"
+  excluded_paths:
+    - GET /books/{uuid}/content/v4
+    - GET /books/{uuid}/metadata/v4
+    - GET /audiobooks/{uuid}/playlists.json
+    - GET /comicbooks/{uuid}/metadata.json
+    - GET https://reader.bookmate.com/p/a/4/d/{document_uuid}/contents/OEBPS/{href}
+  what_they_are: >-
+    Пути содержимого книги — зашифрованный EPUB/аудио и метаданные для
+    расшифровки (ключ, IV). Детали — §3.3, §5 API.md.
+  why_excluded: >-
+    Формальная схема с телом на расшифровку — исполнимый контракт для снятия
+    защиты с платного контента. Нарушение пользовательского соглашения
+    сервиса либо обход технической защиты — сознательно не формализуется
+    в этом репозитории.
+  see_also:
+    - API.md, §3.3
+    - API.md, §5
+
+servers:
+  - url: https://api.bookmate.ru/api/v5
+    description: Основной хост Яндекс Книг (эквивалент api.bookmate.yandex.net)
+  - url: https://api.bookmate.yandex.net/api/v5
+    description: Эквивалентный хост мобильного приложения Яндекс Книги
+
+paths:
+  # ------------------------------------------------------------------ #
+  # Анонимные эндпоинты (без токена)                                    #
+  # ------------------------------------------------------------------ #
+  /{resource}/search:
+    get:
+      operationId: searchResource
+      summary: Поиск по одному типу контента
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      deprecated: true
+      description: |
+        Устарел в пользу пяти отдельных путей ниже (`/books/search` и т.д.) —
+        каждый возвращает свою схему вместо общей `Book` для всех типов.
+        Оставлен как задокументированный факт: параметр запроса называется
+        `query`, не `q` (иначе 400); `per_page` жёстко ограничен 50 на
+        сервере; если результатов меньше `per_page`, все они на странице 1 —
+        страница 2 пустая.
+      parameters:
+        - name: resource
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [books, audiobooks, comicbooks, series, authors]
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: Результаты поиска
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  objects:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Book"
+                  meta:
+                    type: object
+                    properties:
+                      total:
+                        type: object
+                        properties:
+                          value:
+                            type: integer
+                      page:
+                        type: integer
+                      per_page:
+                        type: integer
+                      query:
+                        type: string
+        "400":
+          description: Неверный параметр запроса (например, `q` вместо `query`)
+
+  /books/search:
+    get:
+      operationId: searchBooks
+      summary: Поиск книг
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: |
+        Параметр запроса — `query`, не `q` (иначе 400). `per_page` жёстко
+        ограничен 50 на сервере.
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: Результаты поиска
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  objects:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Book"
+                  meta:
+                    $ref: "#/components/schemas/SearchMeta"
+        "400":
+          description: Неверный параметр запроса (например, `q` вместо `query`)
+
+  /audiobooks/search:
+    get:
+      operationId: searchAudiobooks
+      summary: Поиск аудиокниг
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: Формат ответа и ограничения — как у `/books/search`.
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: Результаты поиска
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  objects:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Audiobook"
+                  meta:
+                    $ref: "#/components/schemas/SearchMeta"
+        "400":
+          description: Неверный параметр запроса
+
+  /comicbooks/search:
+    get:
+      operationId: searchComicbooks
+      summary: Поиск комиксов
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: Формат ответа и ограничения — как у `/books/search`.
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: Результаты поиска
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  objects:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Comicbook"
+                  meta:
+                    $ref: "#/components/schemas/SearchMeta"
+        "400":
+          description: Неверный параметр запроса
+
+  /series/search:
+    get:
+      operationId: searchSeries
+      summary: Поиск серий
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: |
+        Формат ответа и ограничения — как у `/books/search`. Схема `Series`
+        не подтверждена — см. её описание.
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: Результаты поиска
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  objects:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Series"
+                  meta:
+                    $ref: "#/components/schemas/SearchMeta"
+        "400":
+          description: Неверный параметр запроса
+
+  /authors/search:
+    get:
+      operationId: searchAuthors
+      summary: Поиск авторов
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: Формат ответа и ограничения — как у `/books/search`.
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        "200":
+          description: Результаты поиска
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  objects:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Person"
+                  meta:
+                    $ref: "#/components/schemas/SearchMeta"
+        "400":
+          description: Неверный параметр запроса
+
+  /search:
+    get:
+      operationId: searchAll
+      summary: Поиск сразу по всем секциям каталога
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: |
+        `search` — объект с одним ключом на секцию (`books`, `audiobooks`,
+        `comicbooks`, `series`, `authors`, `bookshelves`, `users`), форма
+        секции — `{objects, meta}`, как у `/{resource}/search`. Кроме
+        `series`: там `meta.total` — голое число, не `{value, relation}`.
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Результаты, обёрнутые в ключ `search`
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  search:
+                    type: object
+                    properties:
+                      books:
+                        type: object
+                        properties:
+                          objects:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/Book"
+                          meta:
+                            $ref: "#/components/schemas/SearchMeta"
+                      audiobooks:
+                        type: object
+                        properties:
+                          objects:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/Audiobook"
+                          meta:
+                            $ref: "#/components/schemas/SearchMeta"
+                      comicbooks:
+                        type: object
+                        properties:
+                          objects:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/Comicbook"
+                          meta:
+                            $ref: "#/components/schemas/SearchMeta"
+                      series:
+                        type: object
+                        properties:
+                          objects:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/Series"
+                          meta:
+                            type: object
+                            description: "Здесь `total` — голое число, не `{value, relation}`"
+                      authors:
+                        type: object
+                        properties:
+                          objects:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/Person"
+                          meta:
+                            $ref: "#/components/schemas/SearchMeta"
+                      bookshelves:
+                        type: object
+                        properties:
+                          objects:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/Bookshelf"
+                          meta:
+                            $ref: "#/components/schemas/SearchMeta"
+                      users:
+                        type: object
+                        properties:
+                          objects:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/User"
+                          meta:
+                            $ref: "#/components/schemas/SearchMeta"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      summary: Публичный профиль пользователя
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Профиль
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/User"
+
+  /users/{id}/books:
+    get:
+      operationId: getUserBooks
+      summary: Публичная библиотека пользователя — книги
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: Не требует токена. Подходит для регулярного снятия снимка публичной библиотеки пользователя.
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        "200":
+          description: Список книг
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  books:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Book"
+
+  /users/{id}/audiobooks:
+    get:
+      operationId: getUserAudiobooks
+      summary: Публичная библиотека пользователя — аудиокниги
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Список аудиокниг
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  audiobooks:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Audiobook"
+
+  /users/{id}/comicbooks:
+    get:
+      operationId: getUserComicbooks
+      summary: Публичная библиотека пользователя — комиксы
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: "Пустой список на проверенном аккаунте."
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Список комиксов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  comicbooks:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Comicbook"
+
+  /users/{id}/bookshelves:
+    get:
+      operationId: getUserBookshelves
+      summary: Публичные полки пользователя
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Список полок
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookshelves:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Bookshelf"
+
+  /users/{id}/followings:
+    get:
+      operationId: getUserFollowings
+      summary: На кого подписан пользователь
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Список пользователей
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+
+  /users/{id}/impressions:
+    get:
+      operationId: getUserImpressions
+      summary: Рецензии пользователя
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: "Поля `Impression` (`creator`, `emotions`) те же, что у `/profile/impressions`."
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Список рецензий
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  impressions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Impression"
+
+  /users/{id}/quotes:
+    get:
+      operationId: getUserQuotes
+      summary: Публичные цитаты пользователя
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: "`per_page` рабочий как минимум до 200. Форма ответа как у `/profile/quotes`."
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: Список цитат
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quotes:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Quote"
+
+  /users/{id}/library_cards:
+    get:
+      operationId: getUserLibraryCards
+      summary: Публичные карточки библиотеки пользователя
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: |
+        Не работает: `500` (HTML-страница
+        ошибки, не JSON), стабильно воспроизводится. Не путать с
+        `/profile/library_cards` (авторизованный, рабочий, §3.4 карты API).
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "500":
+          description: "500, HTML-страница ошибки"
+        "200":
+          description: Не воспроизводится
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  library_cards:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LibraryCard"
+
+  /users/{id}/reading_achievements:
+    get:
+      operationId: getUserReadingAchievements
+      summary: Достижения чтения пользователя
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: |
+        Отключено на сервере: `410 Gone`, как и `/profile/reading_achievements`.
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "410":
+          description: Отключено
+        "200":
+          description: Не воспроизводится
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reading_achievements:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReadingAchievement"
+
+  /users/{id}/series/following:
+    get:
+      operationId: getUserSeriesFollowing
+      summary: Серии, на которые подписан пользователь
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: "Схема `Series` подтверждена реальным ответом."
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: Список серий
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  series:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Series"
+
+  /books/{uuid}:
+    get:
+      operationId: getBook
+      summary: Карточка книги
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+      responses:
+        "200":
+          description: Карточка
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  book:
+                    $ref: "#/components/schemas/Book"
+        "404":
+          description: Не найдено
+
+  /books/{uuid}/impressions:
+    get:
+      operationId: getBookImpressions
+      summary: Рецензии на книгу
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+      responses:
+        "200":
+          description: Список рецензий
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  impressions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Impression"
+
+  /books/{uuid}/episodes:
+    get:
+      operationId: getBookEpisodes
+      summary: Эпизоды сериала
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: |
+        На обычной (не сериальной) книге — `200 {"episodes": []}`.
+        Схема элемента для типа `Serial` не подтверждена — сериальных
+        книг не найдено.
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+      responses:
+        "200":
+          description: Список эпизодов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  episodes:
+                    type: array
+                    items:
+                      type: object
+                      description: "Форма элемента не подтверждена — не найдено книг типа Serial для живой проверки"
+
+  /audiobooks/{uuid}:
+    get:
+      operationId: getAudiobook
+      summary: Карточка аудиокниги
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+      responses:
+        "200":
+          description: Карточка
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  audiobook:
+                    $ref: "#/components/schemas/Audiobook"
+
+  /comicbooks/{uuid}:
+    get:
+      operationId: getComicbook
+      summary: Карточка комикса
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+      responses:
+        "200":
+          description: Карточка
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  comicbook:
+                    $ref: "#/components/schemas/Comicbook"
+
+  /comicbooks/{uuid}/impressions:
+    get:
+      operationId: getComicbookImpressions
+      summary: Рецензии на комикс
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: "У рецензии на комикс `book` пусто (`null`), объект в `resource`."
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+      responses:
+        "200":
+          description: Список рецензий
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  impressions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Impression"
+
+  /authors/{uuid}:
+    get:
+      operationId: getAuthor
+      summary: Карточка автора
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+      responses:
+        "200":
+          description: Карточка автора
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  author:
+                    $ref: "#/components/schemas/Person"
+
+  /authors/{uuid}/books:
+    get:
+      operationId: getAuthorBooks
+      summary: Книги автора
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: |
+        Без `role` — `422`, сообщение `role is missing, role must be
+        one of: author, translator, narrator, illustrator, publisher`.
+        С `role=author` — `200 {"books": [...]}`.
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+        - name: role
+          in: query
+          required: true
+          description: "Обязателен. Без него — 422 с перечнем допустимых значений в сообщении."
+          schema:
+            type: string
+            enum: [author, translator, narrator, illustrator, publisher]
+      responses:
+        "200":
+          description: Книги автора в указанной роли
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  books:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Book"
+        "422":
+          description: "`role` отсутствует или недопустим"
+
+  /popular_searches/{lang}:
+    get:
+      operationId: getPopularSearches
+      summary: Популярные поисковые запросы
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - name: lang
+          in: path
+          required: true
+          schema:
+            type: string
+            example: ru
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        "200":
+          description: Список популярных запросов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  popular_searches:
+                    type: object
+                    properties:
+                      locale:
+                        type: string
+                        example: ru
+                      resources:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            title:
+                              type: string
+                            url:
+                              type: string
+                              description: "Относительный путь, например `/audiobooks/{uuid}`, `/bookshelves/{uuid}`, `/books/{slug}`"
+                            deeplink:
+                              type: string
+                              description: "Схема `bookmateplus://`, например `bookmateplus://audiobook?uuid=...`"
+
+  /series/{uuid}:
+    get:
+      operationId: getSeries
+      summary: Карточка серии
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: |
+        Схема `Series` подтверждена реальным ответом.
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+      responses:
+        "200":
+          description: Карточка серии
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  series:
+                    $ref: "#/components/schemas/Series"
+
+  /series/{uuid}/parts:
+    get:
+      operationId: getSeriesParts
+      summary: Части серии
+      tags: [Анонимные]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+      responses:
+        "200":
+          description: Части серии по порядку
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  parts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SeriesPart"
+
+  # ------------------------------------------------------------------ #
+  # Профиль и служебное — требует Auth-Token                            #
+  # ------------------------------------------------------------------ #
+  /profile:
+    get:
+      operationId: getProfile
+      summary: Профиль авторизованного пользователя
+      tags: [Профиль]
+      description: 'Проверена форма ответа — `{"user": {...}}`, значения полей не логировались.'
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      responses:
+        "200":
+          description: Профиль
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /profile/counters:
+    get:
+      operationId: getProfileCounters
+      summary: Счётчики профиля (сообщения, уведомления)
+      tags: [Профиль]
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      responses:
+        "200":
+          description: Счётчики
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  counters:
+                    type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /profile/notifications/status:
+    get:
+      operationId: getNotificationsStatus
+      summary: Статус уведомлений
+      tags: [Профиль]
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: "Проверено 2026-09-03: поле `has_unread_notifications`."
+      responses:
+        "200":
+          description: Статус
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  has_unread_notifications:
+                    type: boolean
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /profile/access_levels:
+    get:
+      operationId: getAccessLevels
+      summary: Уровни доступа к контенту (подписка)
+      tags: [Профиль]
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      responses:
+        "200":
+          description: Уровни доступа
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_levels:
+                    type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /profile/privacy_settings:
+    get:
+      operationId: getPrivacySettings
+      summary: Настройки приватности профиля
+      tags: [Профиль]
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      responses:
+        "200":
+          description: Настройки приватности
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  privacy_settings:
+                    type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /profile/sync_state:
+    get:
+      operationId: getSyncState
+      summary: Состояние синхронизации данных
+      tags: [Профиль]
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      responses:
+        "200":
+          description: Состояние синхронизации
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sync_state:
+                    type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /context:
+    get:
+      operationId: getContext
+      summary: Контекст приложения
+      tags: [Профиль]
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      responses:
+        "200":
+          description: Контекст
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  context:
+                    type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /metadata_secret:
+    get:
+      operationId: getMetadataSecret
+      summary: Защищённые метаданные профиля
+      tags: [Профиль]
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: "Проверено 2026-09-03: поле `secret`, вложенная форма не изучалась."
+      responses:
+        "200":
+          description: Метаданные
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secret:
+                    type: string
+                    description: Значение не изучалось — не логировалось в пробе
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /a/4/user.json:
+    get:
+      operationId: getUserJson
+      summary: Полный JSON текущего пользователя
+      tags: [Профиль]
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: "Не работает: 404."
+      responses:
+        "404":
+          description: Путь не существует
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /a/4/push_notification_settings/restrictions:
+    get:
+      operationId: getPushNotificationRestrictions
+      summary: Ограничения для push-уведомлений
+      tags: [Профиль]
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: "Не работает: 404."
+      responses:
+        "404":
+          description: Путь не существует
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /a/4/d/impressions/emotions:
+    get:
+      operationId: getImpressionEmotions
+      summary: Справочник эмоций для рецензий
+      tags: [Профиль]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: |
+        Не работает: `404` анонимно и с токеном.
+      responses:
+        "404":
+          description: Путь не существует
+
+  /features:
+    get:
+      operationId: getFeatures
+      summary: Флаги фич приложения
+      tags: [Профиль]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: |
+        Параметр повторяется: `?names[]=X&names[]=Y`. Известные имена:
+        xiva_push_sync, show_app_update, sync_audio_text_V2, crm_communication,
+        new_cfi_readings, audio_synthesis_v2, year_paywall_v2, sync_progress_v2,
+        person_subscription, show_paywall_on_every_launch, plus_benefits_from_offer.
+
+        Поле `features`, вложенная форма не изучалась.
+      parameters:
+        - name: names[]
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        "200":
+          description: Значения флагов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  features:
+                    type: object
+                    description: Вложенная форма не изучалась
+
+  # ------------------------------------------------------------------ #
+  # Личная библиотека — требует Auth-Token                              #
+  # ------------------------------------------------------------------ #
+  /profile/library_cards:
+    get:
+      operationId: getMyLibraryCards
+      summary: Карточки личной библиотеки
+      tags: [Личная библиотека]
+      description: |
+        И `offset`, и `limit` выше ~20 не влияют на ответ: сервер всегда
+        возвращает те же ~20 карточек, самые свежие по дате
+        добавления/изменения. Эндпоинт годится только для «последних ~20
+        изменений в библиотеке», не для полного листинга. Для проверки
+        «уже ли книга в библиотеке» использовать ответ
+        `POST /profile/library_cards` (см. `addBookToLibrary`), не этот
+        эндпоинт.
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-11"
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+          description: "Значения выше ~20 не увеличивают размер ответа на практике (см. описание метода)"
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Список карточек
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  library_cards:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LibraryCard"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: addBookToLibrary
+      summary: Добавить книгу в личную библиотеку
+      tags: [Личная библиотека]
+      description: |
+        `200` с полным объектом `library_card`. Если книга уже в личной
+        библиотеке — `422 {"errors": "Эта книга уже есть в вашей
+        библиотеке"}` (не `409 Conflict`) — надёжный сигнал «уже
+        отслеживается», в отличие от `GET /profile/library_cards` (см. её
+        описание — `offset`/`limit` не поддерживаются для полного
+        листинга).
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                book_uuid:
+                  type: string
+              required: [book_uuid]
+      responses:
+        "200":
+          description: Добавлено
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  library_card:
+                    $ref: "#/components/schemas/LibraryCard"
+        "422":
+          description: "Книга уже в библиотеке: `{\"errors\": \"Эта книга уже есть в вашей библиотеке\"}`"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /profile/library_cards/{uuid}:
+    put:
+      operationId: updateLibraryCard
+      summary: Изменить карточку (прогресс чтения, приватность)
+      tags: [Личная библиотека]
+      description: |
+        Тело с `progress`/`state: "finished"` реально помечает книгу
+        прочитанной: значение сохраняется на сервере (виден в повторном
+        `GET` и в клиенте), не только эхом в ответе `200`.
+        `started_at`/`finished_at` через этот путь read-only: сервер
+        отвечает `200` на попытку их переписать, но значение при повторном
+        `GET` не меняется — сервер проставляет их сам при первой
+        простановке `state`.
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lc:
+                  type: object
+                  properties:
+                    uuid:
+                      type: string
+                    public:
+                      type: boolean
+                    progress:
+                      type: integer
+                      minimum: 0
+                      maximum: 100
+                      description: "Подтверждено: реально применяется на сервере и видно в клиенте (не только 200 в ответе)"
+                    state:
+                      type: string
+                      description: "Подтверждено: значение finished реально применяется на сервере и видно в клиенте как «прочитано». Допустимые значения enum кроме finished не перечислены"
+                    started_at:
+                      type: integer
+                      description: "Unix timestamp. Сервер отвечает 200 на попытку переписать значение, но при повторном GET поле не меняется — read-only через этот путь"
+                    finished_at:
+                      type: integer
+                      description: "Unix timestamp. Сервер отвечает 200 на попытку переписать значение, но при повторном GET поле не меняется — read-only через этот путь (см. started_at)"
+      responses:
+        "200":
+          description: Обновлено
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    delete:
+      operationId: removeLibraryCard
+      summary: Удалить книгу из личной библиотеки
+      tags: [Личная библиотека]
+      description: Не проверялось вживую (мутирующая операция).
+      security: [{AuthToken: []}]
+      x-verified: false
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+      responses:
+        "204":
+          description: Удалено
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /profile/upload_books:
+    post:
+      operationId: uploadBook
+      summary: Загрузить свою книгу («Загрузить с устройства», раздел «Все книги»)
+      tags: [Личная библиотека]
+      description: |
+        Поля формы: `public` (`"true"`/`"false"`, обязательно) и `files[]`
+        (сам файл; другие имена поля дают `422`). Принимает только
+        `.epub`/`.fb2` — `.fbz`/`.zip`/`.pdf` отклоняются, zip нужно
+        распаковать на клиенте до `.fb2` внутри.
+
+        Успех → `204` без тела. Загруженная книга появляется в
+        `GET /profile/library_cards` с `state: "pending"`,
+        `is_uploaded: true`. Новую карточку нужно ловить diff'ом множества
+        `uuid` до/после запроса, не по `title`: сервер
+        переводит/нормализует заголовок (например `"Luna: Wolf Moon"` →
+        `"Волчья Луна"`), а повторная загрузка того же содержимого может
+        смёрджиться в уже существующую карточку вместо создания новой (без
+        ошибки, без нового `uuid`). Чтобы пометить книгу прочитанной —
+        `PUT /profile/library_cards/{uuid}` (см. `updateLibraryCard`); он
+        одинаково работает и на только что созданной карточке, и на
+        карточке в `state: "pending"` из более ранней загрузки.
+
+        Требует заголовков реального браузера: `User-Agent` (не
+        `okhttp/…`), `Origin: https://books.yandex.ru`,
+        `Referer: https://books.yandex.ru/upload`. Без них (нестандартный
+        `User-Agent` вместе с квадратными скобками в имени поля формы)
+        соединение обрывается (`ConnectionResetError`) вместо осмысленного
+        кода ответа.
+
+        **Рейт-лимит, независимый от остального API.** После ~9–10
+        загрузок подряд каждый следующий `POST` отвечает `403` с пустым
+        телом. Не короткий burst-лимит: держится не меньше 45–50 минут,
+        бэкофф в 10–25 секунд не помогает. Ограничен именно этим путём:
+        пока он активен, анонимные эндпоинты (`/search`, `/books/{uuid}`)
+        и `POST /profile/library_cards` (добавление уже каталожной книги
+        по `uuid`, без файла — см. `addBookToLibrary`) отвечают нормально.
+        Практический вывод: пакетами по ~10 книг с паузой в десятки минут
+        между пакетами; для книг, уже присутствующих в публичном
+        каталоге, `addBookToLibrary` — рабочий путь в обход этой ручки.
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-11"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                public:
+                  type: string
+                  description: "Строка \"true\"/\"false\", не boolean — обязательное поле"
+                files[]:
+                  type: string
+                  format: binary
+                  description: ".epub или .fb2; другие форматы веб-загрузка отклоняет"
+              required: [public, "files[]"]
+      responses:
+        "204":
+          description: "Загружено. Новая карточка появляется в GET /profile/library_cards с state: pending, is_uploaded: true — без тела ответа тут её uuid не узнать"
+        "403":
+          description: "Рейт-лимит после ~9–10 загрузок подряд, пустое тело. Держится 45–50+ минут, ретраи/бэкофф не помогают"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /profile/books:
+    get:
+      operationId: getProfileBooks
+      summary: Книги профиля (альтернативный путь к личной библиотеке)
+      tags: [Личная библиотека]
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: "Проверено 2026-09-03: поле `books`."
+      responses:
+        "200":
+          description: Список книг
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  books:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Book"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /profile/series/following:
+    get:
+      operationId: getMySeriesFollowing
+      summary: Серии, на которые подписан текущий пользователь
+      tags: [Личная библиотека]
+      description: |
+        Не работает: `404`, хотя
+        `stepan163s/yandex-book-api` вызывает его именно так.
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "404":
+          description: Путь не существует
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ------------------------------------------------------------------ #
+  # Полки — требует Auth-Token для операций с собственными полками      #
+  # ------------------------------------------------------------------ #
+  /profile/bookshelves:
+    get:
+      operationId: getMyBookshelves
+      summary: Мои книжные полки
+      tags: [Полки]
+      description: '`200 {"bookshelves": [...]}`.'
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Список полок
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookshelves:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Bookshelf"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /bookshelves:
+    post:
+      operationId: createBookshelf
+      summary: Создать полку
+      tags: [Полки]
+      description: |
+        Не проверялось вживую (мутирующая операция). Тело —
+        multipart/form-data, не JSON. Форма ответа (объект полки напрямую
+        или обёрнутый в `{bookshelf: ...}`) не подтверждена — использована
+        форма без обёртки из `stepan163s/yandex-book-api`.
+      security: [{AuthToken: []}]
+      x-verified: false
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                bookshelf[title]:
+                  type: string
+                bookshelf[annotation]:
+                  type: string
+                bookshelf[cover]:
+                  type: string
+                  format: binary
+                bookshelf[state]:
+                  type: string
+                  example: published
+      responses:
+        "200":
+          description: Полка создана
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bookshelf"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /bookshelves/{uuid}:
+    get:
+      operationId: getBookshelf
+      summary: Карточка полки
+      tags: [Полки]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: "Обёрнуто в `{\"bookshelf\": {...}}`."
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+      responses:
+        "200":
+          description: Карточка полки
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookshelf:
+                    $ref: "#/components/schemas/Bookshelf"
+    put:
+      operationId: updateBookshelf
+      summary: Редактировать полку
+      tags: [Полки]
+      description: |
+        Не проверялось вживую (мутирующая операция). Тело не подтверждено —
+        по аналогии с `createBookshelf` (multipart, те же поля, все
+        необязательные при редактировании).
+      security: [{AuthToken: []}]
+      x-verified: false
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+      requestBody:
+        required: false
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              x-source: "не подтверждено; предположение по аналогии с createBookshelf"
+              properties:
+                bookshelf[title]:
+                  type: string
+                bookshelf[annotation]:
+                  type: string
+                bookshelf[cover]:
+                  type: string
+                  format: binary
+                bookshelf[state]:
+                  type: string
+                  example: published
+      responses:
+        "200":
+          description: Обновлено
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    delete:
+      operationId: deleteBookshelf
+      summary: Удалить полку
+      tags: [Полки]
+      description: Не проверялось вживую (мутирующая операция).
+      security: [{AuthToken: []}]
+      x-verified: false
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+      responses:
+        "204":
+          description: Удалено
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /bookshelves/{uuid}/books:
+    get:
+      operationId: getBookshelfBooks
+      summary: Книги на полке
+      tags: [Полки]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+      responses:
+        "200":
+          description: Список книг
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  books:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Book"
+
+  /bookshelves/{uuid}/posts:
+    get:
+      operationId: getBookshelfPosts
+      summary: Посты полки
+      tags: [Полки]
+      security: []
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      description: "Пост оборачивает книгу/аудиокнигу/комикс (`resource`) плюс метаданные обсуждения."
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: Список постов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  posts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Post"
+    post:
+      operationId: addPostToBookshelf
+      summary: Добавить книгу на полку
+      tags: [Полки]
+      description: |
+        Не проверялось вживую (мутирующая операция). Тело не подтверждено —
+        по аналогии с `addBookToLibrary` (`{book_uuid}`).
+      security: [{AuthToken: []}]
+      x-verified: false
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              x-source: "не подтверждено; предположение по аналогии с addBookToLibrary"
+              properties:
+                book_uuid:
+                  type: string
+              required: [book_uuid]
+      responses:
+        "200":
+          description: Добавлено
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /bookshelves/{uuid}/posts/{post_uuid}:
+    delete:
+      operationId: removeBookshelfPost
+      summary: Убрать книгу с полки
+      tags: [Полки]
+      description: Не проверялось вживую (мутирующая операция).
+      security: [{AuthToken: []}]
+      x-verified: false
+      parameters:
+        - $ref: "#/components/parameters/Uuid"
+        - name: post_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Убрано
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ------------------------------------------------------------------ #
+  # Достижения и рецензии                                               #
+  # ------------------------------------------------------------------ #
+  /profile/reading_achievements:
+    get:
+      operationId: getMyReadingAchievements
+      summary: Достижения чтения за текущий год
+      tags: [Достижения и рецензии]
+      description: |
+        Отключено на сервере: `410 Gone` (не 404 — путь
+        известен серверу). У `stepan163s/yandex-book-api` задокументирован
+        как рабочий.
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      responses:
+        "410":
+          description: Отключено
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /profile/quotes:
+    get:
+      operationId: getMyQuotes
+      summary: Свои цитаты
+      tags: [Достижения и рецензии]
+      description: |
+        Найден перебором кандидатов, проверен вживую (`200 {"quotes": []}`).
+        Список пуст на проверенном аккаунте — форма элемента не подтверждена,
+        неясно, отличаются ли приватные цитаты от публичных
+        (`/users/{id}/quotes`).
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: Список цитат
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quotes:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Quote"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /profile/impressions:
+    get:
+      operationId: getMyImpressions
+      summary: Свои рецензии
+      tags: [Достижения и рецензии]
+      description: |
+        Найден перебором кандидатов, проверен вживую (`200 {"impressions": [...]}`).
+        Поля расходятся со схемой `Impression` из
+        `stepan163s/yandex-book-api` — см. `x-source`.
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: Список рецензий
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  impressions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Impression"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /profile/notifications:
+    get:
+      operationId: getMyNotifications
+      summary: Лента уведомлений (не просто статус)
+      tags: [Достижения и рецензии]
+      description: |
+        Найден перебором кандидатов, проверен вживую
+        (`200 {"notifications": [...]}`). Отличается от
+        `/profile/notifications/status` (только счётчик/статус).
+      security: [{AuthToken: []}]
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: Список уведомлений
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notifications:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /profile/reading_achievements/{year}:
+    get:
+      operationId: getMyReadingAchievementsForYear
+      summary: Достижения чтения за конкретный год
+      tags: [Достижения и рецензии]
+      description: Не проверялось отдельно — тот же ресурс, что `/profile/reading_achievements` (там подтверждён `410`), но для этого пути ответ не запрашивался.
+      security: [{AuthToken: []}]
+      x-verified: false
+      parameters:
+        - name: year
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "410":
+          description: Не подтверждено напрямую — экстраполировано с `/profile/reading_achievements`
+          x-verified: false
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ------------------------------------------------------------------ #
+  # Каталог                                                             #
+  # ------------------------------------------------------------------ #
+  /catalog:
+    get:
+      operationId: getCatalog
+      summary: Дерево тем/жанров каталога
+      tags: [Каталог]
+      security: []
+      description: |
+        Найден перебором кандидатов, проверен вживую (`200 {"topics": [...]}`).
+        Анонимный запрос (без `Auth-Token`) тоже отвечает `200` — токен не
+        обязателен.
+        `/catalog/topics` и `/topics/popular` — `404`.
+      x-verified: true
+      x-verified-date: "2026-09-03"
+      parameters:
+        - $ref: "#/components/parameters/Page"
+      responses:
+        "200":
+          description: Дерево тем
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  topics:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Topic"
+
+components:
+  securitySchemes:
+    AuthToken:
+      type: apiKey
+      in: header
+      name: Auth-Token
+      description: |
+        OAuth-токен Яндекса (`y0_AgAAAA...`). Получение: переход по
+        `https://oauth.yandex.ru/authorize?response_type=token&client_id=4483e97bab6e486a9822973109a14d05`,
+        токен возвращается во фрагменте redirect URL (`#access_token=...`).
+        Подробности — §2 карты API.
+
+  responses:
+    Unauthorized:
+      description: Токен отсутствует, истёк или отозван
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  parameters:
+    UserId:
+      name: id
+      in: path
+      required: true
+      description: "Числовой ID, UUID или псевдоним профиля (в ответах API — поле `login`, но это не логин Яндекс-аккаунта, общий для всех сервисов Яндекса, а отдельный публичный псевдоним профиля Яндекс Книг)"
+      schema:
+        type: string
+    Uuid:
+      name: uuid
+      in: path
+      required: true
+      schema:
+        type: string
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+    PerPage:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+
+  schemas:
+    Error:
+      type: object
+      description: |
+        Форма варьируется — сообщение приходит в одном из полей (§5 карты
+        API). Основная задокументированная форма ошибок ресурсов
+        (`/authors/{uuid}`, `/authors/{uuid}/books`, и т.д.) подтверждена
+        вживую: `{"error": {"code": N, "message": "..."}}` — вложенный
+        объект, а не плоские `error`/`message` на верхнем уровне.
+      properties:
+        message:
+          type: string
+          nullable: true
+        error:
+          nullable: true
+          description: "В подтверждённых вживую ответах — объект `{code, message}`, не строка."
+          oneOf:
+            - type: string
+            - type: object
+              properties:
+                code:
+                  type: integer
+                message:
+                  type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              message:
+                type: string
+
+    SearchMeta:
+      type: object
+      description: "Поля подтверждены вживую для `/{resource}/search` и секций `/search`."
+      properties:
+        total:
+          type: object
+          properties:
+            value:
+              type: integer
+            relation:
+              type: string
+              example: eq
+              description: "Наблюдалось только значение eq"
+        page:
+          type: integer
+        per_page:
+          type: integer
+        query:
+          type: string
+        matches_user_lang:
+          type: boolean
+          nullable: true
+          description: "Есть не у всех типов ресурса (например, отсутствует у `users`, `bookshelves`)"
+        url:
+          type: string
+          description: "Внутренний путь бэкенда, обслужившего запрос, например `https://books.yandex.ru/api/v5/books/search` — диагностическое поле, не для использования клиентом"
+
+    Cover:
+      type: object
+      properties:
+        large:
+          type: string
+          format: uri
+          nullable: true
+        small:
+          type: string
+          format: uri
+          nullable: true
+        placeholder:
+          type: string
+          description: base64 PNG-заглушка
+          nullable: true
+        ratio:
+          type: number
+        background_color_hex:
+          type: string
+          nullable: true
+        url:
+          type: string
+          format: uri
+          description: "GraphQL-вариант отдаёт `url` вместо `large` — к REST не относится."
+          nullable: true
+
+    Person:
+      type: object
+      required: [uuid, name]
+      description: "Поля `about`, `born_at`, `died_at`, `gender`, `external_links`, `featured_work` подтверждены вживую (`/authors/{uuid}`, `/authors/search`)."
+      properties:
+        name:
+          type: string
+        locale:
+          type: string
+          nullable: true
+        uuid:
+          type: string
+        works_count:
+          type: integer
+        image:
+          $ref: "#/components/schemas/Cover"
+        removed:
+          type: boolean
+        about:
+          type: string
+          nullable: true
+        born_at:
+          type: string
+          nullable: true
+          description: "Формат не изучен — наблюдалось только `null`"
+        died_at:
+          type: string
+          nullable: true
+          description: "Формат не изучен — наблюдалось только `null`"
+        gender:
+          type: string
+          nullable: true
+        external_links:
+          type: array
+          items:
+            type: object
+          description: "Наблюдался только пустой массив — форма элемента не изучена"
+        featured_work:
+          nullable: true
+          description: "Наблюдался только `null` в карточке автора (не в результатах поиска, где поля нет вовсе)"
+
+    User:
+      type: object
+      required: [id, login]
+      description: |
+        Форма расходится между эндпоинтами. `/users/{id}` и вложенные
+        объекты (`Impression.creator`, `Bookshelf.creator`) — полная форма
+        ниже. Результаты поиска (`/{resource}/search`, секция `users` в
+        `/search`) — уже: `avatar, bookshelves_count, cards_count,
+        followers_count, following, gender, id, library_cards_count,
+        login, name, background_color_hex`, без `uuid` и `about`.
+      properties:
+        uuid:
+          type: string
+          nullable: true
+          description: "Есть в `/users/{id}`; отсутствует в объектах из результатов поиска"
+        id:
+          type: integer
+        login:
+          type: string
+          description: "Название поля API, но по значению это публичный псевдоним профиля Яндекс Книг, а не логин Яндекс-аккаунта — эти два значения могут отличаться"
+        name:
+          type: string
+        avatar:
+          $ref: "#/components/schemas/Cover"
+        background_color_hex:
+          type: string
+          nullable: true
+          description: "Есть на верхнем уровне User, не только внутри Cover"
+        bookshelves_count:
+          type: integer
+        followers_count:
+          type: integer
+        followings_count:
+          type: integer
+          x-source: "stepan163s/yandex-book-api (не подтверждено live-ответом)"
+        following:
+          type: boolean
+          nullable: true
+          description: "Подписан ли текущий пользователь на этого — анонимно всегда `false`"
+        cards_count:
+          type: integer
+          nullable: true
+          description: "Отдельно от `library_cards_count` — разница не изучена"
+        library_cards_count:
+          type: integer
+        gender:
+          type: string
+          nullable: true
+        about:
+          type: string
+          nullable: true
+          x-source: "stepan163s/yandex-book-api (не подтверждено live-ответом)"
+
+    Book:
+      type: object
+      required: [uuid, title]
+      description: |
+        Общая схема для книг/аудиокниг/комиксов: `can_be_read` у книг и
+        комиксов, `can_be_listened` у аудиокниг. Поля — из сохранённого
+        ответа `/users/{id}/books`. Для аудиокниг и
+        комиксов см. также `Audiobook`/`Comicbook` (доп. поля поверх этой
+        схемы).
+      properties:
+        uuid:
+          type: string
+        init_uuid:
+          type: string
+        title:
+          type: string
+        annotation:
+          type: string
+          nullable: true
+        editor_annotation:
+          type: string
+          nullable: true
+        authors:
+          type: string
+          description: Имена авторов одной строкой
+        authors_objects:
+          type: array
+          items:
+            $ref: "#/components/schemas/Person"
+        cover:
+          $ref: "#/components/schemas/Cover"
+        language:
+          type: string
+          nullable: true
+        paper_pages:
+          type: integer
+          nullable: true
+        restricted_reading_on_web:
+          type: boolean
+        type:
+          type: string
+          example: Book
+        source_type:
+          type: string
+          nullable: true
+        publication_date:
+          type: integer
+          nullable: true
+          description: Год издания конкретного тиража — не путать с `original_year`
+        original_year:
+          type: integer
+          nullable: true
+        owner_catalog_title:
+          type: string
+          nullable: true
+        is_uploaded:
+          type: boolean
+        bookshelves_count:
+          type: integer
+        impressions_count:
+          type: integer
+        quotes_count:
+          type: integer
+        readers_count:
+          type: integer
+        can_be_read:
+          type: boolean
+          description: Основной признак доступности у книг/комиксов
+        can_be_listened:
+          type: boolean
+          description: Основной признак доступности у аудиокниг (не наблюдалось в live-ответе для книг, подтверждено по аудиокнигам)
+        access_restrictions:
+          type: array
+          items:
+            type: object
+            properties:
+              level:
+                type: string
+                example: bookmate
+        age_restriction:
+          type: string
+          nullable: true
+        in_library:
+          type: boolean
+          description: "В анонимном ответе всегда false — не значит, что книги нет в чьей-то библиотеке"
+        in_wishlist:
+          type: boolean
+          description: "В анонимном ответе всегда false"
+        labels:
+          type: array
+          items:
+            type: object
+        subscription_level:
+          type: string
+          nullable: true
+        library_card:
+          nullable: true
+          description: "null в анонимном/публичном ответе; в авторизованном — объект LibraryCard"
+          allOf:
+            - $ref: "#/components/schemas/LibraryCard"
+        resource_type:
+          type: string
+          nullable: true
+          x-source: "stepan163s/yandex-book-api (не подтверждено live-ответом)"
+        subscription_levels:
+          type: array
+          items:
+            type: string
+          x-source: "stepan163s/yandex-book-api (не подтверждено live-ответом; в live-ответе видели только subscription_level в единственном числе)"
+
+    Audiobook:
+      type: object
+      required: [uuid, title]
+      description: |
+        Похожа на `Book`, не идентична: `authors` — массив `Person` (у
+        `Book` строка), `type` отсутствует, есть `can_be_listened`, нет
+        `can_be_read`.
+      properties:
+        uuid:
+          type: string
+        init_uuid:
+          type: string
+        title:
+          type: string
+        annotation:
+          type: string
+          nullable: true
+        editor_annotation:
+          type: string
+          nullable: true
+        authors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Person"
+          description: "Массив, не строка, как у `Book.authors`"
+        narrators:
+          type: array
+          items:
+            $ref: "#/components/schemas/Person"
+        cover:
+          $ref: "#/components/schemas/Cover"
+        language:
+          type: string
+          nullable: true
+        document_uuid:
+          type: string
+          nullable: true
+          description: "Полный UUID, не короткий id, как `uuid`"
+        duration:
+          type: integer
+          nullable: true
+          description: Секунды
+        listeners_count:
+          type: integer
+        audio_card:
+          nullable: true
+          description: "Наблюдался только `null` — форма не изучена"
+        publication_date:
+          type: integer
+          nullable: true
+        owner_catalog_title:
+          type: string
+          nullable: true
+        bookshelves_count:
+          type: integer
+        impressions_count:
+          type: integer
+        can_be_listened:
+          type: boolean
+        age_restriction:
+          type: string
+          nullable: true
+        labels:
+          type: array
+          items:
+            type: object
+        subscription_level:
+          type: string
+          nullable: true
+        background_color_hex:
+          type: string
+          nullable: true
+
+    Comicbook:
+      type: object
+      required: [uuid, title]
+      description: |
+        Похожа на `Book`, не идентична: `authors` — массив `Person`,
+        `can_be_read` (не `can_be_listened`), `type` отсутствует.
+      properties:
+        uuid:
+          type: string
+        init_uuid:
+          type: string
+        title:
+          type: string
+        annotation:
+          type: string
+          nullable: true
+        editor_annotation:
+          type: string
+          nullable: true
+        authors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Person"
+          description: "Массив, не строка, как у `Book.authors`"
+        cover:
+          $ref: "#/components/schemas/Cover"
+        language:
+          type: string
+          nullable: true
+        document_uuid:
+          type: string
+          nullable: true
+        comic_card:
+          nullable: true
+          description: "Наблюдался только `null` — форма не изучена"
+        pages_count:
+          type: integer
+          nullable: true
+        orientation:
+          type: string
+          nullable: true
+          description: "Наблюдалось только значение portrait, полный диапазон enum не подтверждён"
+        publication_date:
+          type: integer
+          nullable: true
+        original_year:
+          type: integer
+          nullable: true
+        owner_catalog_title:
+          type: string
+          nullable: true
+        bookshelves_count:
+          type: integer
+        impressions_count:
+          type: integer
+        readers_count:
+          type: integer
+        can_be_read:
+          type: boolean
+        age_restriction:
+          type: string
+          nullable: true
+        labels:
+          type: array
+          items:
+            type: object
+        subscription_level:
+          type: string
+          nullable: true
+        background_color_hex:
+          type: string
+          nullable: true
+
+    Series:
+      type: object
+      required: [uuid, title]
+      properties:
+        uuid:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        cover:
+          $ref: "#/components/schemas/Cover"
+        authors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Person"
+        followers_count:
+          type: integer
+        kinds:
+          type: array
+          items:
+            type: string
+          description: "Наблюдалось `[\"books\"]` — вероятно тип контента в серии (books/audiobooks/comicbooks)"
+        language:
+          type: string
+          nullable: true
+        parts_count:
+          type: integer
+        has_new_parts:
+          type: boolean
+        following:
+          type: boolean
+        notifications_enabled:
+          type: boolean
+        last_part_at:
+          type: string
+          nullable: true
+          description: "Формат не изучен — наблюдалось только `null`"
+        topics:
+          type: array
+          items:
+            type: object
+          description: "Наблюдался только пустой массив — форма элемента не изучена, вероятно `Topic`"
+        user_progress:
+          nullable: true
+          description: "Наблюдался только `null` (без авторизации) — форма для авторизованного запроса не изучена"
+
+    SeriesPart:
+      type: object
+      required: [uuid]
+      description: "Элемент `/series/{uuid}/parts`. Проверено 2026-09-03: только имена полей."
+      properties:
+        uuid:
+          type: string
+        position:
+          type: integer
+        position_label:
+          type: string
+          nullable: true
+        resource_type:
+          type: string
+          description: "Наблюдалось `Book` — вероятно тот же набор, что у `Impression.resource_type`"
+        resource:
+          $ref: "#/components/schemas/Book"
+
+    LibraryCard:
+      type: object
+      required: [uuid]
+      description: |
+        Проверено вживую (`GET /profile/library_cards?limit=1&offset=0`,
+        имена полей, без значений). `stepan163s/yandex-book-api` использует
+        другие имена (`reading_progress`, `added_at`, `updated_at`) — не
+        совпадают с реальным ответом.
+      properties:
+        uuid:
+          type: string
+        title:
+          type: string
+        book:
+          $ref: "#/components/schemas/Book"
+        state:
+          type: string
+          description: |
+            Подтверждённые вживую значения: "reading" (карточка, активно
+            читаемая/слушаемая), "pending" (только что загруженный через
+            uploadBook файл, ещё не помечен прочитанным), "finished"
+            (помечена прочитанной через updateLibraryCard). Полный список
+            допустимых значений enum на сервере не подтверждён.
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        started_at:
+          type: integer
+          nullable: true
+          description: unix timestamp
+        finished_at:
+          type: integer
+          nullable: true
+          description: unix timestamp
+        accessed_at:
+          type: integer
+          nullable: true
+        public:
+          type: boolean
+        is_uploaded:
+          type: boolean
+        is_in_child_library:
+          type: boolean
+        size_approx:
+          type: integer
+          nullable: true
+        sync_counter:
+          type: integer
+        changes_count:
+          type: integer
+        document_uuid:
+          type: string
+          nullable: true
+        chapter_uuid:
+          type: string
+          nullable: true
+        cfi:
+          type: string
+          nullable: true
+          description: EPUB CFI — позиция последнего чтения
+        fragment:
+          type: object
+          nullable: true
+        last_read_excerpt:
+          type: string
+          nullable: true
+
+    Bookshelf:
+      type: object
+      required: [uuid, title]
+      description: "`following`, `posts_count`, `creator`, `authors` подтверждены вживую (`/{resource}/search`, секция `bookshelves`) — расхождение с `stepan163s/yandex-book-api` снято."
+      properties:
+        uuid:
+          type: string
+        title:
+          type: string
+        name:
+          type: string
+          x-source: "stepan163s/yandex-book-api (не подтверждено live-ответом; возможно дублирует title)"
+        annotation:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+          x-source: "stepan163s/yandex-book-api (не подтверждено live-ответом)"
+        books_count:
+          type: integer
+        followers_count:
+          type: integer
+        posts_count:
+          type: integer
+        following:
+          type: boolean
+        cover:
+          $ref: "#/components/schemas/Cover"
+        creator:
+          $ref: "#/components/schemas/User"
+        authors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Person"
+
+    Post:
+      type: object
+      required: [uuid]
+      description: "Элемент `/bookshelves/{uuid}/posts`. Проверено 2026-09-03: только имена полей."
+      properties:
+        uuid:
+          type: string
+        annotation:
+          type: string
+          nullable: true
+          description: "Комментарий добавившего, не аннотация книги"
+        created_at:
+          type: integer
+        position:
+          type: integer
+        readers_count:
+          type: integer
+        liked:
+          type: boolean
+        likes:
+          type: integer
+        comments_count:
+          type: integer
+        resource_type:
+          type: string
+          description: "Наблюдалось `Book`"
+        resource:
+          $ref: "#/components/schemas/Book"
+        bookshelf:
+          $ref: "#/components/schemas/Bookshelf"
+        creator:
+          $ref: "#/components/schemas/User"
+        comments:
+          type: array
+          items:
+            type: object
+          description: "Форма элемента не изучена"
+        liker_users:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+
+    Quote:
+      type: object
+      required: [item_uuid]
+      description: Поля по `stepan163s/yandex-book-api` (`yandex_book/quote/quote.py`) — не подтверждено live-ответом.
+      properties:
+        cfi:
+          type: string
+          nullable: true
+        start_node_xpath:
+          type: string
+          nullable: true
+        start_node_offset:
+          type: integer
+          nullable: true
+        finish_node_xpath:
+          type: string
+          nullable: true
+        finish_node_offset:
+          type: integer
+          nullable: true
+        item_uuid:
+          type: string
+          description: UUID книги/аудиокниги
+        content:
+          type: string
+          description: Текст цитаты
+        comment:
+          type: string
+          nullable: true
+        color:
+          type: integer
+          nullable: true
+        style:
+          type: string
+          nullable: true
+        state:
+          type: string
+        created_at:
+          type: integer
+        progress:
+          type: integer
+          description: Прогресс в % на момент цитаты
+        liked:
+          type: boolean
+        likes_count:
+          type: integer
+        comments_count:
+          type: integer
+        book:
+          $ref: "#/components/schemas/Book"
+        authors:
+          type: string
+
+    Impression:
+      type: object
+      required: [uuid]
+      description: |
+        Проверено вживую (`GET /profile/impressions`, имена полей, без
+        значений). `stepan163s/yandex-book-api` использует `emotion`
+        (строка) и `user`, без `updated_at` — реальный ответ использует
+        `emotions` (массив) и `creator`, `updated_at` нет.
+      properties:
+        uuid:
+          type: string
+        content:
+          type: string
+          description: Текст рецензии
+        created_at:
+          type: integer
+        state:
+          type: string
+        liked:
+          type: boolean
+        likes_count:
+          type: integer
+        comments_count:
+          type: integer
+        changes_count:
+          type: integer
+        emotions:
+          type: array
+          items:
+            type: string
+          description: "Множественное число в реальном ответе — не `emotion` из stepan163s/yandex-book-api"
+        book:
+          $ref: "#/components/schemas/Book"
+        creator:
+          description: "Не `user`, как в stepan163s/yandex-book-api"
+          allOf:
+            - $ref: "#/components/schemas/User"
+        resource:
+          type: object
+          nullable: true
+          description: "Ресурс, на который оставлена рецензия, когда это не книга — на комиксе `book` был `null`, объект пришёл сюда."
+        resource_type:
+          type: string
+          nullable: true
+          description: "Наблюдалось `Comicbook` для рецензии на комикс"
+        liker_users:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+
+    Notification:
+      type: object
+      required: [key]
+      description: "Проверено 2026-09-03: только имена полей."
+      properties:
+        key:
+          type: string
+        content:
+          type: string
+          nullable: true
+        created_at:
+          type: integer
+        updated_at:
+          type: integer
+        deeplink:
+          type: string
+          nullable: true
+        web_url:
+          type: string
+          nullable: true
+        activist:
+          type: object
+          nullable: true
+          description: Вероятный инициатор события, форма не проверена
+
+    Topic:
+      type: object
+      required: [uuid, slug]
+      description: |
+        `GET /catalog`, анонимно. Соответствует типу `Topic` из
+        GraphQL-схемы (§4 карты API), поля не идентичны.
+      properties:
+        uuid:
+          type: string
+        slug:
+          type: string
+        title:
+          type: string
+        language:
+          type: string
+          nullable: true
+        icon:
+          type: string
+          nullable: true
+          description: "base64-строка (PNG), не URL"
+        background:
+          type: object
+          nullable: true
+          description: "Объект `{large: URL}`, не hex-цвет и не строка"
+          properties:
+            large:
+              type: string
+              format: uri
+        is_subtopic:
+          type: boolean
+        parent_slug:
+          type: string
+          nullable: true
+        subtopics:
+          type: array
+          items:
+            $ref: "#/components/schemas/Topic"
+
+    ReadingChallenge:
+      type: object
+      properties:
+        promised_books_count:
+          type: integer
+        finished_books_count:
+          type: integer
+        image_url:
+          type: string
+          nullable: true
+        share_url:
+          type: string
+          nullable: true
+
+    ReadingAchievement:
+      type: object
+      description: "Эндпоинт отключён: `410 Gone`."
+      properties:
+        finished_books_count:
+          type: integer
+        year:
+          type: integer
+        seconds:
+          type: integer
+        pages:
+          type: integer
+        last_updated:
+          type: integer
+          nullable: true
+        share_url:
+          type: string
+          nullable: true
+        reading_challenge:
+          $ref: "#/components/schemas/ReadingChallenge"
+        user:
+          $ref: "#/components/schemas/User"
+
+x-graphql:
+  description: |
+    Не выражается в OpenAPI как path (одна операция POST с меняющимся
+    телом). Эндпоинт: POST https://api-gateway.bookmate.yandex.net/graphql,
+    тело {"operationName", "variables", "query"}. Работает по вайтлисту
+    операций — интроспекция и произвольные запросы отбиваются.
+
+    Подтверждённые операции: Search (variables.query: {cursor, noMisspell,
+    query, types}), ProfileSubscriptions (variables.subscriptionParams),
+    Statistics (variables.requestTime, ISO-8601, Auth-Token, возвращает
+    user.loyalty.statistics {daysPerMonth, streak, streakRecord,
+    todayTime}). Тела запросов — §4 карты API, `stepan163s/yandex-book-api`
+    (`yandex_book/client.py`, `_GQL_SEARCH`, `_GQL_SUBSCRIPTIONS`,
+    `_GQL_STATISTICS`). Не проверено.
