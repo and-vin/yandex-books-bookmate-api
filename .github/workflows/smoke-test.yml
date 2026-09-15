@@ -1,0 +1,83 @@
+name: Smoke test (anonymous endpoints)
+
+on:
+  schedule:
+    - cron: "0 6 1,15 * *"
+  push:
+    branches: [main]
+    paths:
+      - "openapi.yaml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run smoke tests
+        id: smoke
+        run: |
+          set +e
+          UA="okhttp/4.12.0"
+          BASE="https://api.bookmate.ru/api/v5"
+          fail=0
+
+          check() {
+            local desc="$1" url="$2" key="$3" out="$4"
+            local status
+            status=$(curl -sS -o "$out" -w "%{http_code}" -A "$UA" -H "Accept-Encoding: identity" "$url")
+            if [ "$status" != "200" ] || ! jq -e ".$key" "$out" >/dev/null 2>&1; then
+              echo "FAIL: $desc ($url) -> HTTP $status"
+              fail=1
+              return 1
+            fi
+            echo "OK: $desc"
+            return 0
+          }
+
+          check "books search" "$BASE/books/search?query=Толстой&per_page=1" "objects" /tmp/search.json
+          check "authors search" "$BASE/authors/search?query=Толстой&per_page=1" "objects" /tmp/authors.json
+          check "catalog" "$BASE/catalog" "topics" /tmp/catalog.json
+
+          uuid=$(jq -r '.objects[0].uuid // empty' /tmp/search.json 2>/dev/null)
+          if [ -n "$uuid" ]; then
+            check "book card" "$BASE/books/$uuid" "book" /tmp/book.json
+          else
+            echo "SKIP: book card (no uuid from search)"
+          fi
+
+          exit $fail
+
+      - name: Create or update issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "Smoke test failed: anonymous endpoints";
+            const label = "smoke-test-failure";
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: label,
+            });
+            if (issues.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body: `Anonymous-endpoint smoke test failed.\n\nRun: ${runUrl}`,
+                labels: [label],
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues[0].number,
+                body: `Still failing.\n\nRun: ${runUrl}`,
+              });
+            }
