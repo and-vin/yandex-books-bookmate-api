@@ -4,6 +4,7 @@
 
 [![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
 [![OpenAPI valid](https://github.com/and-vin/yandex-books-bookmate-api/actions/workflows/validate.yml/badge.svg)](https://github.com/and-vin/yandex-books-bookmate-api/actions/workflows/validate.yml)
+[![Smoke test](https://github.com/and-vin/yandex-books-bookmate-api/actions/workflows/smoke-test.yml/badge.svg)](https://github.com/and-vin/yandex-books-bookmate-api/actions/workflows/smoke-test.yml)
 [![Docs](https://img.shields.io/badge/docs-interactive%20reference-blue)](https://and-vin.github.io/yandex-books-bookmate-api/)
 
 Неофициальная, восстановленная из трафика карта REST- и GraphQL-API сервиса Яндекс Книги / Bookmate. У сервиса нет публичного API и официальной документации — этот репозиторий описывает факты, наблюдаемые в реальном трафике мобильного приложения и веб-ридера.
@@ -14,6 +15,9 @@
 
 - **[`openapi.yaml`](./openapi.yaml)** — спецификация [OpenAPI 3.0](https://spec.openapis.org/oas/v3.0.3): REST-пути, форма запросов/ответов, схемы моделей. При каждом пуше проверяется валидатором [`openapi-spec-validator`](https://github.com/python-openapi/openapi-spec-validator). У каждого пути есть поля `x-verified`/`x-verified-date` — видно, подтверждён ли факт живым запросом или это допущение из стороннего проекта.
 - **[`API.md`](./API.md)** — всё, что не выражается в OpenAPI: хосты, авторизация (OAuth-токен и cookie-сессия), два разных GraphQL-шлюза, особенности формы ответов, рейт-лимиты, форма ошибок, а также список эндпоинтов, которые были проверены и подтверждённо **не существуют**.
+- **[`AGENTS.md`](./AGENTS.md)** — компактная инструкция для AI-агентов/LLM-клиентов: базовые URL, авторизация, самые полезные операции, неработающие эндпоинты, форма ошибок, готовые сценарии.
+- **[`CHANGELOG.md`](./CHANGELOG.md)** — журнал изменений документации.
+- **[`.github/workflows/smoke-test.yml`](./.github/workflows/smoke-test.yml)** — раз в две недели (и при изменении `openapi.yaml`) проверяет анонимные эндпоинты на живом сервере; при ошибке создаёт issue.
 
 ## Зачем это нужно
 
