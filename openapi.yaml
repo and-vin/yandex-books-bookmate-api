@@ -1280,42 +1280,26 @@ paths:
       summary: Карточки личной библиотеки
       tags: [Личная библиотека]
       description: |
-        И `offset`, и `limit` выше ~20 не влияют на ответ при страничном
-        сдвиге через них: сервер всегда возвращает те же ~20 карточек,
-        самые свежие по дате добавления/изменения. Полный листинг работает
-        через `page`/`per_page` вместо `offset`/`limit`: `per_page`
-        реально задаёт размер страницы, `page=2` отдаёт следующую
-        непересекающуюся страницу. Для проверки «уже ли книга в
-        библиотеке» надёжнее ответ `POST /profile/library_cards` (см.
-        `addBookToLibrary`), чем листинг этого эндпоинта.
+        `per_page` задаёт размер страницы, `page=2` отдаёт следующую
+        непересекающуюся страницу — рабочая пагинация для полного
+        листинга. Для проверки «уже ли книга в библиотеке» надёжнее ответ
+        `POST /profile/library_cards` (см. `addBookToLibrary`), чем
+        листинг этого эндпоинта.
       security: [{AuthToken: []}]
       x-verified: true
       x-verified-date: "2026-09-15"
       parameters:
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 50
-            maximum: 100
-          description: "Значения выше ~20 не увеличивают размер ответа на практике (см. описание метода). Для полного листинга использовать per_page вместо limit"
-        - name: offset
-          in: query
-          schema:
-            type: integer
-            default: 0
-          description: "Не влияет на ответ выше ~20 (см. описание метода). Для полного листинга использовать page вместо offset"
         - name: page
           in: query
           schema:
             type: integer
             default: 1
-          description: "Рабочая пагинация (в отличие от offset): page=2 отдаёт следующую непересекающуюся страницу"
+          description: "page=2 отдаёт следующую непересекающуюся страницу"
         - name: per_page
           in: query
           schema:
             type: integer
-          description: "Рабочий размер страницы (в отличие от limit)"
+          description: "Размер страницы"
       responses:
         "200":
           description: Список карточек
@@ -1338,9 +1322,7 @@ paths:
         `200` с полным объектом `library_card`. Если книга уже в личной
         библиотеке — `422 {"errors": "Эта книга уже есть в вашей
         библиотеке"}` (не `409 Conflict`) — надёжный сигнал «уже
-        отслеживается», в отличие от `GET /profile/library_cards` (см. её
-        описание — `offset`/`limit` не поддерживаются для полного
-        листинга).
+        отслеживается», надёжнее листинга `GET /profile/library_cards`.
       security: [{AuthToken: []}]
       x-verified: true
       x-verified-date: "2026-09-03"
