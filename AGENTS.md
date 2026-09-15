@@ -22,7 +22,7 @@ Machine-oriented shortcut. Source of truth: `openapi.yaml` (contract) and `API.m
 - `GET /users/{id}` — public profile. `{id}` = numeric id, UUID, or profile alias (response field `login`, not the Yandex account login).
 - `GET /users/{id}/books` — public library.
 - `GET /profile` — own profile (auth required).
-- `GET /profile/library_cards?limit=&offset=` — own library cards (auth required). `offset`/`limit` above ~20 do not change the response — always ~20 most recent. Do not use to check "is book X already in library" — use the `POST` response below instead.
+- `GET /profile/library_cards?limit=&offset=` — own library cards (auth required). `offset`/`limit` above ~20 do not change the response — always ~20 most recent. Use `page`/`per_page` instead for a full listing (works correctly: `per_page` sets page size, `page=2` returns a genuinely non-overlapping next page). Do not use to check "is book X already in library" — use the `POST` response below instead.
 - `POST /profile/library_cards {"book_uuid":"..."}` — add book. `422 {"errors":"..."}` (not `409`) if already present — reliable "already tracked" signal.
 - `PUT /profile/library_cards/{uuid} {"lc":{"uuid","progress","state","finished_at"}}` — set progress/finished state.
 
@@ -53,7 +53,7 @@ Machine-oriented shortcut. Source of truth: `openapi.yaml` (contract) and `API.m
 
 - **Find a book:** `GET /books/search?query=<title>&per_page=20`.
 - **Find all books by an author:** `GET /authors/search?query=<name>` → `GET /authors/{uuid}/books?role=author` (`role` required, else `422`).
-- **Export own library:** `GET /profile` → `GET /profile/library_cards?limit=&offset=` (pagination unreliable above ~20, see above) → `GET /books/{uuid}` per item for extra metadata if needed.
+- **Export own library:** `GET /profile` → `GET /profile/library_cards?page=&per_page=` (use `page`/`per_page`, not `offset`/`limit` — see above) → `GET /books/{uuid}` per item for extra metadata if needed.
 
 ## Out of scope
 
