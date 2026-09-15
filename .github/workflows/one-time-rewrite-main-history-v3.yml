@@ -1,0 +1,47 @@
+name: One-time rewrite main history v3
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  rewrite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Fix author of the social-preview commit
+        run: |
+          set -euo pipefail
+          git config user.name "and-vin"
+          git config user.email "andrew.vinokurov@gmail.com"
+
+          git checkout -B main-rewrite-v3 origin/main
+
+          GIT_SEQUENCE_EDITOR="sed -i '0,/Add social preview image/{s/^pick/edit/}'" \
+            git rebase -i 8a86b1836a1681406dbe1ac69f0df034a38cf926
+
+          git commit --amend --author="and-vin <andrew.vinokurov@gmail.com>" --no-edit
+
+          git rebase --continue
+
+          echo "--- new log ---"
+          git log --oneline --format='%H %an <%ae> %s' -6
+
+      - name: Verify tree unchanged before force-push
+        run: |
+          set -euo pipefail
+          old_tree=$(git rev-parse origin/main^{tree})
+          new_tree=$(git rev-parse HEAD^{tree})
+          if [ "$old_tree" != "$new_tree" ]; then
+            echo "ERROR: tree mismatch, refusing to push"
+            exit 1
+          fi
+
+      - name: Force-push rewritten main
+        run: git push --force-with-lease origin main-rewrite-v3:main
