@@ -1,0 +1,22 @@
+name: One-time delete stale branches
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete stale branches
+        run: |
+          set -euo pipefail
+          git push origin --delete \
+            claude/review-feedback-planning-5t7ila \
+            claude/zealous-gates-cad8av
