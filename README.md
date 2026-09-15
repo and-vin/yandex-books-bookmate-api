@@ -4,6 +4,7 @@
 
 [![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
 [![OpenAPI valid](https://github.com/and-vin/yandex-books-bookmate-api/actions/workflows/validate.yml/badge.svg)](https://github.com/and-vin/yandex-books-bookmate-api/actions/workflows/validate.yml)
+[![Smoke test](https://github.com/and-vin/yandex-books-bookmate-api/actions/workflows/smoke-test.yml/badge.svg)](https://github.com/and-vin/yandex-books-bookmate-api/actions/workflows/smoke-test.yml)
 [![Docs](https://img.shields.io/badge/docs-interactive%20reference-blue)](https://and-vin.github.io/yandex-books-bookmate-api/)
 
 An unofficial, reverse-engineered reference for the Yandex Books / Bookmate REST and GraphQL API. There is no official public API or documentation for this service — this repository documents what has been observed in real client traffic (mobile app and web reader).
@@ -14,6 +15,9 @@ An unofficial, reverse-engineered reference for the Yandex Books / Bookmate REST
 
 - **[`openapi.yaml`](./openapi.yaml)** — an [OpenAPI 3.0](https://spec.openapis.org/oas/v3.0.3) specification covering REST paths, request/response shapes, and model schemas. Validated with [`openapi-spec-validator`](https://github.com/python-openapi/openapi-spec-validator) on every push. Every path carries `x-verified` / `x-verified-date`, so you can tell a fact confirmed against a live response from an assumption carried over from another project.
 - **[`API.md`](./API.md)** — everything an OpenAPI document can't express: hosts, authentication (OAuth token vs. cookie session), the two separate GraphQL gateways, response-format gotchas, rate limits, known error shapes, and a list of endpoints that were probed and confirmed **not** to exist.
+- **[`AGENTS.md`](./AGENTS.md)** — compact, machine-oriented usage guide for AI agents/LLM clients: base URLs, auth, most-used operations, known-broken endpoints, error shape, task recipes.
+- **[`CHANGELOG.md`](./CHANGELOG.md)** — record of changes to this documentation.
+- **[`.github/workflows/smoke-test.yml`](./.github/workflows/smoke-test.yml)** — biweekly (and on `openapi.yaml` change) live check of the anonymous endpoints; opens a GitHub issue on failure.
 
 ## Why this exists
 
