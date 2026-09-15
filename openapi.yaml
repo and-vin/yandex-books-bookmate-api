@@ -1299,7 +1299,8 @@ paths:
           in: query
           schema:
             type: integer
-          description: "Размер страницы"
+            maximum: 50
+          description: "Размер страницы; сервер молча ограничивает значениями выше 50 — при per_page=51 и выше в ответе всё равно 50 карточек"
       responses:
         "200":
           description: Список карточек
