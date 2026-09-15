@@ -8,12 +8,20 @@ info:
 
     Эндпоинты с `security: [AuthToken]` требуют заголовок
     `Auth-Token: y0_AgAAAA...` — получение токена описано в
-    `components.securitySchemes.AuthToken`. `x-verified: true` +
-    `x-verified-date` — путь проверен живым запросом с реальным токеном.
-    `x-verified: false` — путь взят из независимых клиентов (в основном
-    `stepan163s/yandex-book-api`), не проверен. `/profile/reading_achievements`
-    отвечает `410`, `/profile/series/following` — `404`, вопреки
-    задокументированному в этих клиентах поведению.
+    `components.securitySchemes.AuthToken`. Статус проверки каждого пути —
+    `x-verified-status`, одно из:
+      - `live` — подтверждён живым запросом с реальным токеном
+        (см. `x-verified-date`);
+      - `extrapolated` — не запрошен напрямую, форма выведена по аналогии
+        с другим подтверждённым путём этого же API (источник — в `x-source`);
+      - `third-party` — форма взята из независимых клиентов (в основном
+        `stepan163s/yandex-book-api`), живым ответом не подтверждена
+        (источник — в `x-source`);
+      - `untested` — не выполнялся вживую, чтобы не мутировать данные
+        аккаунта (запись/удаление), путь и параметры — из документированного
+        поведения приложения.
+    `/profile/reading_achievements` отвечает `410`, `/profile/series/following`
+    — `404`, вопреки задокументированному в сторонних клиентах поведению.
 
     Эндпоинты извлечения и расшифровки контента книг не формализованы —
     см. `x-content-extraction-excluded` ниже.
@@ -74,7 +82,7 @@ paths:
       summary: Поиск по одному типу контента
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       deprecated: true
       description: |
@@ -142,7 +150,7 @@ paths:
       summary: Поиск книг
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: |
         Параметр запроса — `query`, не `q` (иначе 400). `per_page` жёстко
@@ -187,7 +195,7 @@ paths:
       summary: Поиск аудиокниг
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: Формат ответа и ограничения — как у `/books/search`.
       parameters:
@@ -230,7 +238,7 @@ paths:
       summary: Поиск комиксов
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: Формат ответа и ограничения — как у `/books/search`.
       parameters:
@@ -273,7 +281,7 @@ paths:
       summary: Поиск серий
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: |
         Формат ответа и ограничения — как у `/books/search`. Схема `Series`
@@ -318,7 +326,7 @@ paths:
       summary: Поиск авторов
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: Формат ответа и ограничения — как у `/books/search`.
       parameters:
@@ -361,7 +369,7 @@ paths:
       summary: Поиск сразу по всем секциям каталога
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: |
         `search` — объект с одним ключом на секцию (`books`, `audiobooks`,
@@ -456,7 +464,7 @@ paths:
       summary: Публичный профиль пользователя
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - $ref: "#/components/parameters/UserId"
@@ -477,7 +485,7 @@ paths:
       summary: Публичная библиотека пользователя — книги
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: Не требует токена. Подходит для регулярного снятия снимка публичной библиотеки пользователя.
       parameters:
@@ -506,7 +514,7 @@ paths:
       summary: Публичная библиотека пользователя — аудиокниги
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - $ref: "#/components/parameters/UserId"
@@ -529,7 +537,7 @@ paths:
       summary: Публичная библиотека пользователя — комиксы
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: "Пустой список на проверенном аккаунте."
       parameters:
@@ -553,7 +561,7 @@ paths:
       summary: Публичные полки пользователя
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - $ref: "#/components/parameters/UserId"
@@ -576,7 +584,7 @@ paths:
       summary: На кого подписан пользователь
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - $ref: "#/components/parameters/UserId"
@@ -599,7 +607,7 @@ paths:
       summary: Рецензии пользователя
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: "Поля `Impression` (`creator`, `emotions`) те же, что у `/profile/impressions`."
       parameters:
@@ -623,7 +631,7 @@ paths:
       summary: Публичные цитаты пользователя
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: "`per_page` рабочий как минимум до 200. Форма ответа как у `/profile/quotes`."
       parameters:
@@ -649,7 +657,7 @@ paths:
       summary: Публичные карточки библиотеки пользователя
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: |
         Не работает: `500` (HTML-страница
@@ -680,7 +688,7 @@ paths:
       summary: Достижения чтения пользователя
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: |
         Отключено на сервере: `410 Gone`, как и `/profile/reading_achievements`.
@@ -707,7 +715,7 @@ paths:
       summary: Серии, на которые подписан пользователь
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: "Схема `Series` подтверждена реальным ответом."
       parameters:
@@ -733,7 +741,7 @@ paths:
       summary: Карточка книги
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - $ref: "#/components/parameters/Uuid"
@@ -756,7 +764,7 @@ paths:
       summary: Рецензии на книгу
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - $ref: "#/components/parameters/Uuid"
@@ -779,7 +787,7 @@ paths:
       summary: Эпизоды сериала
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: |
         На обычной (не сериальной) книге — `200 {"episodes": []}`.
@@ -807,7 +815,7 @@ paths:
       summary: Карточка аудиокниги
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - $ref: "#/components/parameters/Uuid"
@@ -828,7 +836,7 @@ paths:
       summary: Карточка комикса
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - $ref: "#/components/parameters/Uuid"
@@ -849,7 +857,7 @@ paths:
       summary: Рецензии на комикс
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: "У рецензии на комикс `book` пусто (`null`), объект в `resource`."
       parameters:
@@ -873,7 +881,7 @@ paths:
       summary: Карточка автора
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - $ref: "#/components/parameters/Uuid"
@@ -894,7 +902,7 @@ paths:
       summary: Книги автора
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: |
         Без `role` — `422`, сообщение `role is missing, role must be
@@ -930,7 +938,7 @@ paths:
       summary: Популярные поисковые запросы
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - name: lang
@@ -978,7 +986,7 @@ paths:
       summary: Карточка серии
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: |
         Схема `Series` подтверждена реальным ответом.
@@ -1001,7 +1009,7 @@ paths:
       summary: Части серии
       tags: [Анонимные]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - $ref: "#/components/parameters/Uuid"
@@ -1028,7 +1036,7 @@ paths:
       tags: [Профиль]
       description: 'Проверена форма ответа — `{"user": {...}}`, значения полей не логировались.'
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       responses:
         "200":
@@ -1049,7 +1057,7 @@ paths:
       summary: Счётчики профиля (сообщения, уведомления)
       tags: [Профиль]
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       responses:
         "200":
@@ -1070,7 +1078,7 @@ paths:
       summary: Статус уведомлений
       tags: [Профиль]
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: "Проверено 2026-09-03: поле `has_unread_notifications`."
       responses:
@@ -1092,7 +1100,7 @@ paths:
       summary: Уровни доступа к контенту (подписка)
       tags: [Профиль]
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       responses:
         "200":
@@ -1113,7 +1121,7 @@ paths:
       summary: Настройки приватности профиля
       tags: [Профиль]
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       responses:
         "200":
@@ -1134,7 +1142,7 @@ paths:
       summary: Состояние синхронизации данных
       tags: [Профиль]
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       responses:
         "200":
@@ -1155,7 +1163,7 @@ paths:
       summary: Контекст приложения
       tags: [Профиль]
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       responses:
         "200":
@@ -1176,7 +1184,7 @@ paths:
       summary: Защищённые метаданные профиля
       tags: [Профиль]
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: "Проверено 2026-09-03: поле `secret`, вложенная форма не изучалась."
       responses:
@@ -1199,7 +1207,7 @@ paths:
       summary: Полный JSON текущего пользователя
       tags: [Профиль]
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: "Не работает: 404."
       responses:
@@ -1214,7 +1222,7 @@ paths:
       summary: Ограничения для push-уведомлений
       tags: [Профиль]
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: "Не работает: 404."
       responses:
@@ -1228,7 +1236,7 @@ paths:
       operationId: getImpressionEmotions
       summary: Справочник эмоций для рецензий
       tags: [Профиль]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: |
         Не работает: `404` анонимно и с токеном.
@@ -1241,7 +1249,7 @@ paths:
       operationId: getFeatures
       summary: Флаги фич приложения
       tags: [Профиль]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: |
         Параметр повторяется: `?names[]=X&names[]=Y`. Известные имена:
@@ -1286,7 +1294,7 @@ paths:
         `POST /profile/library_cards` (см. `addBookToLibrary`), чем
         листинг этого эндпоинта.
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-15"
       parameters:
         - name: page
@@ -1325,7 +1333,7 @@ paths:
         библиотеке"}` (не `409 Conflict`) — надёжный сигнал «уже
         отслеживается», надёжнее листинга `GET /profile/library_cards`.
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       requestBody:
         required: true
@@ -1366,7 +1374,7 @@ paths:
         `GET` не меняется — сервер проставляет их сам при первой
         простановке `state`.
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - $ref: "#/components/parameters/Uuid"
@@ -1413,7 +1421,7 @@ paths:
       tags: [Личная библиотека]
       description: Не проверялось вживую (мутирующая операция).
       security: [{AuthToken: []}]
-      x-verified: false
+      x-verified-status: untested
       parameters:
         - $ref: "#/components/parameters/Uuid"
       responses:
@@ -1463,7 +1471,7 @@ paths:
         между пакетами; для книг, уже присутствующих в публичном
         каталоге, `addBookToLibrary` — рабочий путь в обход этой ручки.
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-11"
       requestBody:
         required: true
@@ -1494,7 +1502,7 @@ paths:
       summary: Книги профиля (альтернативный путь к личной библиотеке)
       tags: [Личная библиотека]
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: "Проверено 2026-09-03: поле `books`."
       responses:
@@ -1521,7 +1529,7 @@ paths:
         Не работает: `404`, хотя
         `stepan163s/yandex-book-api` вызывает его именно так.
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - $ref: "#/components/parameters/Page"
@@ -1542,7 +1550,7 @@ paths:
       tags: [Полки]
       description: '`200 {"bookshelves": [...]}`.'
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - name: page
@@ -1581,7 +1589,8 @@ paths:
         или обёрнутый в `{bookshelf: ...}`) не подтверждена — использована
         форма без обёртки из `stepan163s/yandex-book-api`.
       security: [{AuthToken: []}]
-      x-verified: false
+      x-verified-status: third-party
+      x-source: "stepan163s/yandex-book-api — форма ответа (без обёртки) не подтверждена live-запросом"
       requestBody:
         required: true
         content:
@@ -1615,7 +1624,7 @@ paths:
       summary: Карточка полки
       tags: [Полки]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: "Обёрнуто в `{\"bookshelf\": {...}}`."
       parameters:
@@ -1639,7 +1648,8 @@ paths:
         по аналогии с `createBookshelf` (multipart, те же поля, все
         необязательные при редактировании).
       security: [{AuthToken: []}]
-      x-verified: false
+      x-verified-status: extrapolated
+      x-source: "по аналогии с createBookshelf (multipart, те же поля, все необязательные)"
       parameters:
         - $ref: "#/components/parameters/Uuid"
       requestBody:
@@ -1675,7 +1685,7 @@ paths:
       tags: [Полки]
       description: Не проверялось вживую (мутирующая операция).
       security: [{AuthToken: []}]
-      x-verified: false
+      x-verified-status: untested
       parameters:
         - $ref: "#/components/parameters/Uuid"
       responses:
@@ -1690,7 +1700,7 @@ paths:
       summary: Книги на полке
       tags: [Полки]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - $ref: "#/components/parameters/Uuid"
@@ -1713,7 +1723,7 @@ paths:
       summary: Посты полки
       tags: [Полки]
       security: []
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       description: "Пост оборачивает книгу/аудиокнигу/комикс (`resource`) плюс метаданные обсуждения."
       parameters:
@@ -1740,7 +1750,8 @@ paths:
         Не проверялось вживую (мутирующая операция). Тело не подтверждено —
         по аналогии с `addBookToLibrary` (`{book_uuid}`).
       security: [{AuthToken: []}]
-      x-verified: false
+      x-verified-status: extrapolated
+      x-source: "по аналогии с addBookToLibrary ({book_uuid})"
       parameters:
         - $ref: "#/components/parameters/Uuid"
       requestBody:
@@ -1771,7 +1782,7 @@ paths:
       tags: [Полки]
       description: Не проверялось вживую (мутирующая операция).
       security: [{AuthToken: []}]
-      x-verified: false
+      x-verified-status: untested
       parameters:
         - $ref: "#/components/parameters/Uuid"
         - name: post_uuid
@@ -1798,7 +1809,7 @@ paths:
         известен серверу). У `stepan163s/yandex-book-api` задокументирован
         как рабочий.
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       responses:
         "410":
@@ -1817,7 +1828,7 @@ paths:
         неясно, отличаются ли приватные цитаты от публичных
         (`/users/{id}/quotes`).
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - $ref: "#/components/parameters/Page"
@@ -1847,7 +1858,7 @@ paths:
         Поля расходятся со схемой `Impression` из
         `stepan163s/yandex-book-api` — см. `x-source`.
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - $ref: "#/components/parameters/Page"
@@ -1877,7 +1888,7 @@ paths:
         (`200 {"notifications": [...]}`). Отличается от
         `/profile/notifications/status` (только счётчик/статус).
       security: [{AuthToken: []}]
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - $ref: "#/components/parameters/Page"
@@ -1904,7 +1915,8 @@ paths:
       tags: [Достижения и рецензии]
       description: Не проверялось отдельно — тот же ресурс, что `/profile/reading_achievements` (там подтверждён `410`), но для этого пути ответ не запрашивался.
       security: [{AuthToken: []}]
-      x-verified: false
+      x-verified-status: extrapolated
+      x-source: "экстраполировано с getMyReadingAchievements — тот же ресурс, подтверждён 410"
       parameters:
         - name: year
           in: path
@@ -1914,7 +1926,6 @@ paths:
       responses:
         "410":
           description: Не подтверждено напрямую — экстраполировано с `/profile/reading_achievements`
-          x-verified: false
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -1932,7 +1943,7 @@ paths:
         Анонимный запрос (без `Auth-Token`) тоже отвечает `200` — токен не
         обязателен.
         `/catalog/topics` и `/topics/popular` — `404`.
-      x-verified: true
+      x-verified-status: live
       x-verified-date: "2026-09-03"
       parameters:
         - $ref: "#/components/parameters/Page"

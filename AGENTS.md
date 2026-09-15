@@ -46,8 +46,12 @@ Machine-oriented shortcut. Source of truth: `openapi.yaml` (contract) and `API.m
 
 ## Verification semantics
 
-- `x-verified: true` + `x-verified-date` on an `openapi.yaml` operation = confirmed against a live response.
-- `x-verified: false` = sourced from a third-party client (see API.md §7), not independently confirmed.
+`x-verified-status` on an `openapi.yaml` operation, one of:
+
+- `live` + `x-verified-date` = confirmed against a live response.
+- `extrapolated` + `x-source` = not requested directly, shape inferred from another confirmed operation in this API.
+- `third-party` + `x-source` = sourced from a third-party client (see API.md §7), not independently confirmed.
+- `untested` = not run live to avoid mutating account data; path/params taken from documented app behavior.
 
 ## Task recipes
 

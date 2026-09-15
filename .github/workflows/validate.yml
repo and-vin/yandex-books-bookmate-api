@@ -5,10 +5,12 @@ on:
     branches: [main]
     paths:
       - "openapi.yaml"
+      - "scripts/check_openapi_consistency.py"
       - ".github/workflows/validate.yml"
   pull_request:
     paths:
       - "openapi.yaml"
+      - "scripts/check_openapi_consistency.py"
 
 jobs:
   validate:
@@ -18,5 +20,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
-      - run: pip install openapi-spec-validator
+      - run: pip install openapi-spec-validator pyyaml
       - run: python -m openapi_spec_validator openapi.yaml
+      - run: python scripts/check_openapi_consistency.py openapi.yaml
