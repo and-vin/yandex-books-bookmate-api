@@ -13,11 +13,22 @@ An unofficial, reverse-engineered reference for the Yandex Books / Bookmate REST
 
 ## What's here
 
+- **[`examples/search.json`](./examples/search.json)** — ready-to-send anonymous web GraphQL search. Change `variables`, keep the whitelisted `query` text unchanged. Legacy REST search currently returns `200 {}`; adding authentication does not restore the tested books/authors searches.
 - **[`openapi.yaml`](./openapi.yaml)** — an [OpenAPI 3.0](https://spec.openapis.org/oas/v3.0.3) specification covering REST paths, request/response shapes, and model schemas. Validated with [`openapi-spec-validator`](https://github.com/python-openapi/openapi-spec-validator) and a [consistency check](./scripts/check_openapi_consistency.py) on every push. Every path carries `x-verified-status` (`live` / `extrapolated` / `third-party` / `untested`), so you can tell a fact confirmed against a live response from an assumption carried over from another project.
 - **[`API.md`](./API.md)** — everything an OpenAPI document can't express: hosts, authentication (OAuth token vs. cookie session), the two separate GraphQL gateways, response-format gotchas, rate limits, known error shapes, and a list of endpoints that were probed and confirmed **not** to exist.
 - **[`AGENTS.md`](./AGENTS.md)** — compact, machine-oriented usage guide for AI agents/LLM clients: base URLs, auth, most-used operations, known-broken endpoints, error shape, task recipes.
 - **[`CHANGELOG.md`](./CHANGELOG.md)** — record of changes to this documentation.
-- **[`.github/workflows/smoke-test.yml`](./.github/workflows/smoke-test.yml)** — biweekly (and on `openapi.yaml` change) live check of the anonymous endpoints; opens a GitHub issue on failure.
+- **[`.github/workflows/smoke-test.yml`](./.github/workflows/smoke-test.yml)** — checks live web search for books/authors and independent REST catalog/card requests, on schedule and relevant changes. Requires real results, not just HTTP 200; opens a GitHub issue on failure on `main`.
+
+## Try public search
+
+From the repository root; no token or cookies required:
+
+```bash
+curl --fail-with-body --silent --show-error 'https://books.yandex.ru/node-api/p-graphql/' -H 'Content-Type: application/json' --data-binary '@examples/search.json'
+```
+
+Use `curl.exe` in PowerShell. Results are in `data.search.page`; reject a response containing GraphQL `errors` even with HTTP 200. For authors set `variables.type` to `AUTHOR` and change `variables.search`. See [`API.md`, §4.2](./API.md#42-публичный-веб-поиск) for cursor pagination and migration from REST.
 
 ## Why this exists
 
@@ -25,7 +36,7 @@ Yandex Books (the Russian-market side of Bookmate, backend split from internatio
 
 ## Who this is for
 
-Developers building personal tools around a Yandex Books / Bookmate account: library export/sync scripts, reading-stats dashboards, backup tools, bots, or clients in any language — this repo is language-agnostic (plain OpenAPI + Markdown, no code).
+Developers building personal tools around a Yandex Books / Bookmate account: library export/sync scripts, reading-stats dashboards, backup tools, bots, or clients in any language. This is a language-agnostic reference with OpenAPI, Markdown and a JSON request fixture; Python scripts validate the reference and run smoke checks.
 
 ## Scope and limits
 

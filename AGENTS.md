@@ -6,18 +6,20 @@ Machine-oriented shortcut. Source of truth: `openapi.yaml` (contract) and `API.m
 
 - REST: `https://api.bookmate.ru/api/v5` (same backend as `api.bookmate.yandex.net/api/v5`)
 - GraphQL (mobile): `https://api-gateway.bookmate.yandex.net/graphql` — persisted-query whitelist only, arbitrary queries rejected
+- GraphQL (web search): `https://books.yandex.ru/node-api/p-graphql/` — use the exact `Search` request in `examples/search.json`, changing only `variables`.
 
 ## Authentication
 
 - Header: `Auth-Token: y0_AgAAAA...` (Yandex OAuth token, see API.md §2)
-- Anonymous (no header) works for: `search`, `/users/{id}` and its subresources, `/books/{uuid}`, `/catalog`
-- Anonymous requests require: `User-Agent: okhttp/4.12.0`, `Accept-Encoding: identity` (not `gzip`)
-- Anonymous responses always return `in_library`/`in_wishlist` as empty/`false`
+- Anonymous (no header) works for web GraphQL `Search`, `/users/{id}` and its subresources, `/books/{uuid}`, `/catalog`.
+- Legacy REST `/<resource>/search` and `/search` return HTTP 200 with `{}` instead of results. Adding a valid token does not repair the tested books/authors searches.
+- Anonymous REST requests require: `User-Agent: okhttp/4.12.0`, `Accept-Encoding: identity` (not `gzip`). Web search needs a JSON request body and `Content-Type: application/json`.
+- Anonymous REST responses do not reflect your `in_library`/`in_wishlist`; web search returns `progress: null`.
 
 ## Most useful operations
 
-- `GET /<resource>/search?query=...&page=&per_page=` — resource ∈ `books|audiobooks|comicbooks|series|authors`. Param is `query`, not `q`. `per_page` max 50.
-- `GET /search?query=...` — cross-resource search, response key `search`.
+- `POST /node-api/p-graphql/` on `books.yandex.ru` with `examples/search.json`: `variables.search` is the text, `variables.type` is `TEXTBOOK|AUDIOBOOK|COMICBOOK|SERIES|AUTHOR` (omit/null for mixed results), `variables.cursor` starts as `""`. Results: `data.search.page`; carry forward `data.search.cursor` unchanged. Reject `errors` even with HTTP 200.
+- Web search items differ from REST: books use `item.book.initUuid` / `item.book.name`; authors use `item.uuid` / `item.name`. Do not read `.objects` from a GraphQL response.
 - `GET /books/{uuid}` — book card, key `book`.
 - `GET /users/{id}` — public profile. `{id}` = numeric id, UUID, or profile alias (response field `login`, not the Yandex account login).
 - `GET /users/{id}/books` — public library.
@@ -36,9 +38,9 @@ Machine-oriented shortcut. Source of truth: `openapi.yaml` (contract) and `API.m
 
 ## Search gotchas
 
-- Fuzzy matching: `Дюна` also returns `Долина Дюн` — normalize/filter client-side.
-- Do not put the author name in the query string — tokens are AND-combined and narrow results incorrectly. Search by title, filter by author locally.
-- If total results < `per_page`, all results are on page 1; page 2 is empty.
+- Search may return similar titles — normalize/filter client-side.
+- For exact matching, search by title and compare the returned title and authors locally.
+- Web search has cursor pagination. Do not send REST `page`/`per_page` parameters to it.
 
 ## Error shape
 
@@ -55,10 +57,10 @@ Machine-oriented shortcut. Source of truth: `openapi.yaml` (contract) and `API.m
 
 ## Task recipes
 
-- **Find a book:** `GET /books/search?query=<title>&per_page=20`.
-- **Find all books by an author:** `GET /authors/search?query=<name>` → `GET /authors/{uuid}/books?role=author` (`role` required, else `422`).
+- **Find a book:** web `Search`, `variables.search=<title>`, `variables.type=TEXTBOOK`; open the REST card using `book.initUuid`.
+- **Find all books by an author:** web `Search`, `variables.type=AUTHOR` → `GET /authors/{uuid}/books?role=author` (`role` required, else `422`).
 - **Export own library:** `GET /profile` → `GET /profile/library_cards?page=&per_page=` → `GET /books/{uuid}` per item for extra metadata if needed.
 
 ## Out of scope
 
-No SDK/client code in this repo — OpenAPI + Markdown only, language-agnostic.
+No SDK/client library in this repo — language-agnostic OpenAPI, Markdown and a JSON request fixture. Python scripts are validation/smoke checks.

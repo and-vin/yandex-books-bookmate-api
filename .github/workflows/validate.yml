@@ -2,15 +2,22 @@ name: Validate OpenAPI spec
 
 on:
   push:
-    branches: [main]
+    branches: [main, "codex/**"]
     paths:
       - "openapi.yaml"
       - "scripts/check_openapi_consistency.py"
       - ".github/workflows/validate.yml"
+      - "scripts/smoke_test.py"
+      - "tests/**"
+      - "examples/search.json"
   pull_request:
     paths:
       - "openapi.yaml"
       - "scripts/check_openapi_consistency.py"
+      - ".github/workflows/validate.yml"
+      - "scripts/smoke_test.py"
+      - "tests/**"
+      - "examples/search.json"
 
 jobs:
   validate:
@@ -23,3 +30,4 @@ jobs:
       - run: pip install openapi-spec-validator pyyaml
       - run: python -m openapi_spec_validator openapi.yaml
       - run: python scripts/check_openapi_consistency.py openapi.yaml
+      - run: python -m unittest discover -s tests -v

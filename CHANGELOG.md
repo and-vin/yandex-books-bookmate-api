@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-08
+
+### Fixed
+- Replaced non-functional REST search examples with the anonymous web GraphQL `Search` operation and an executable JSON request fixture. Legacy REST search returns HTTP 200 with `{}`; valid authentication does not restore the tested books/authors searches.
+- Smoke checks now require real GraphQL results, reject GraphQL errors and malformed JSON, and check a public REST book card independently of search. Added regression tests for empty HTTP 200 responses and partial failures.
+- Documented web search response fields, content filters and cursor pagination in OpenAPI and both usage guides. Kept the historical REST search schemas, marked deprecated with their current limitation.
+
 ## 2026-09-15
 
 ### Added

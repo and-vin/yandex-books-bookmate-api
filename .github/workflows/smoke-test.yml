@@ -1,62 +1,49 @@
-name: Smoke test (anonymous endpoints)
+name: Smoke test (public endpoints)
 
 on:
   schedule:
     - cron: "0 6 1,15 * *"
   push:
-    branches: [main]
+    branches: [main, "codex/**"]
     paths:
       - "openapi.yaml"
+      - "examples/search.json"
+      - "scripts/smoke_test.py"
+      - ".github/workflows/smoke-test.yml"
+  pull_request:
+    paths:
+      - "openapi.yaml"
+      - "examples/search.json"
+      - "scripts/smoke_test.py"
+      - ".github/workflows/smoke-test.yml"
   workflow_dispatch: {}
 
 permissions:
   contents: read
-  issues: write
 
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Run smoke tests
-        id: smoke
-        run: |
-          set +e
-          UA="okhttp/4.12.0"
-          BASE="https://api.bookmate.ru/api/v5"
-          fail=0
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Check public search, catalog and book card
+        run: python scripts/smoke_test.py
 
-          check() {
-            local desc="$1" url="$2" key="$3" out="$4"
-            local status
-            status=$(curl -sS -o "$out" -w "%{http_code}" -A "$UA" -H "Accept-Encoding: identity" "$url")
-            if [ "$status" != "200" ] || ! jq -e ".$key" "$out" >/dev/null 2>&1; then
-              echo "FAIL: $desc ($url) -> HTTP $status"
-              fail=1
-              return 1
-            fi
-            echo "OK: $desc"
-            return 0
-          }
-
-          check "books search" "$BASE/books/search?query=Толстой&per_page=1" "objects" /tmp/search.json
-          check "authors search" "$BASE/authors/search?query=Толстой&per_page=1" "objects" /tmp/authors.json
-          check "catalog" "$BASE/catalog" "topics" /tmp/catalog.json
-
-          uuid=$(jq -r '.objects[0].uuid // empty' /tmp/search.json 2>/dev/null)
-          if [ -n "$uuid" ]; then
-            check "book card" "$BASE/books/$uuid" "book" /tmp/book.json
-          else
-            echo "SKIP: book card (no uuid from search)"
-          fi
-
-          exit $fail
-
-      - name: Create or update issue on failure
-        if: failure()
-        uses: actions/github-script@v7
+  report-failure:
+    needs: smoke
+    if: failure() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@v7
         with:
           script: |
-            const title = "Smoke test failed: anonymous endpoints";
+            const title = "Smoke test failed: public endpoints";
             const label = "smoke-test-failure";
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const { data: issues } = await github.rest.issues.listForRepo({
@@ -70,7 +57,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 title,
-                body: `Anonymous-endpoint smoke test failed.\n\nRun: ${runUrl}`,
+                body: `Public-endpoint smoke test failed.\n\nRun: ${runUrl}`,
                 labels: [label],
               });
             } else {

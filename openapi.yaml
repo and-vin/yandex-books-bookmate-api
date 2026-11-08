@@ -33,8 +33,10 @@ info:
     Неофициальный API. Использование — на свой риск.
 
 tags:
+  - name: Веб-поиск
+    description: Публичный поиск через GraphQL-шлюз веб-клиента
   - name: Анонимные
-    description: Поиск и публичные карточки — без токена
+    description: Публичные карточки и исторические REST-пути поиска
   - name: Профиль
     description: Профиль текущего пользователя и служебные эндпоинты
   - name: Личная библиотека
@@ -73,6 +75,41 @@ servers:
     description: Эквивалентный хост мобильного приложения Яндекс Книги
 
 paths:
+  /node-api/p-graphql/:
+    servers:
+      - url: https://books.yandex.ru
+    post:
+      operationId: searchWebGraphQL
+      summary: Публичный поиск через веб-шлюз GraphQL
+      tags: [Веб-поиск]
+      security: []
+      x-verified-status: live
+      x-verified-date: "2026-11-08"
+      description: |
+        Операция `Search` возвращает публичные метаданные без токена и cookie.
+        Готовое тело — `examples/search.json`. Меняйте только `variables`:
+        текст `query` должен точно соответствовать белому списку сервера.
+        Произвольная или сокращённая выборка полей даёт HTTP 200 с `errors`.
+        Наличие HTTP 200 само по себе не означает успех: проверяйте отсутствие
+        `errors` и массив `data.search.page`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebSearchRequest"
+            examples:
+              books:
+                summary: Готовый запрос поиска книг
+                externalValue: ./examples/search.json
+      responses:
+        "200":
+          description: Результаты в data.search либо ошибка GraphQL в errors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebSearchResponse"
+
   # ------------------------------------------------------------------ #
   # Анонимные эндпоинты (без токена)                                    #
   # ------------------------------------------------------------------ #
@@ -86,6 +123,9 @@ paths:
       x-verified-date: "2026-09-03"
       deprecated: true
       description: |
+        Устаревший REST-поиск возвращает HTTP 200 с `{}` вместо результатов.
+        Для рабочего поиска используйте `searchWebGraphQL`. Схема ниже
+        описывает исторический ответ; HTTP 200 не подтверждает наличие данных.
         Устарел в пользу пяти отдельных путей ниже (`/books/search` и т.д.) —
         каждый возвращает свою схему вместо общей `Book` для всех типов.
         Оставлен как задокументированный факт: параметр запроса называется
@@ -117,9 +157,10 @@ paths:
             maximum: 50
       responses:
         "200":
-          description: Результаты поиска
+          description: Пустой объект вместо результатов; историческая схема сохранена ниже
           content:
             application/json:
+              example: {}
               schema:
                 type: object
                 properties:
@@ -150,9 +191,13 @@ paths:
       summary: Поиск книг
       tags: [Анонимные]
       security: []
+      deprecated: true
       x-verified-status: live
       x-verified-date: "2026-09-03"
       description: |
+        Устаревший REST-поиск возвращает HTTP 200 с `{}` вместо результатов.
+        Для рабочего поиска используйте `searchWebGraphQL`. Схема ниже
+        описывает исторический ответ; HTTP 200 не подтверждает наличие данных.
         Параметр запроса — `query`, не `q` (иначе 400). `per_page` жёстко
         ограничен 50 на сервере.
       parameters:
@@ -174,9 +219,10 @@ paths:
             maximum: 50
       responses:
         "200":
-          description: Результаты поиска
+          description: Пустой объект вместо результатов; историческая схема сохранена ниже
           content:
             application/json:
+              example: {}
               schema:
                 type: object
                 properties:
@@ -195,9 +241,14 @@ paths:
       summary: Поиск аудиокниг
       tags: [Анонимные]
       security: []
+      deprecated: true
       x-verified-status: live
       x-verified-date: "2026-09-03"
-      description: Формат ответа и ограничения — как у `/books/search`.
+      description: |
+        Устаревший REST-поиск возвращает HTTP 200 с `{}` вместо результатов.
+        Для рабочего поиска используйте `searchWebGraphQL`. Схема ниже
+        описывает исторический ответ; HTTP 200 не подтверждает наличие данных.
+        Формат ответа и ограничения — как у `/books/search`.
       parameters:
         - name: query
           in: query
@@ -217,9 +268,10 @@ paths:
             maximum: 50
       responses:
         "200":
-          description: Результаты поиска
+          description: Пустой объект вместо результатов; историческая схема сохранена ниже
           content:
             application/json:
+              example: {}
               schema:
                 type: object
                 properties:
@@ -238,9 +290,14 @@ paths:
       summary: Поиск комиксов
       tags: [Анонимные]
       security: []
+      deprecated: true
       x-verified-status: live
       x-verified-date: "2026-09-03"
-      description: Формат ответа и ограничения — как у `/books/search`.
+      description: |
+        Устаревший REST-поиск возвращает HTTP 200 с `{}` вместо результатов.
+        Для рабочего поиска используйте `searchWebGraphQL`. Схема ниже
+        описывает исторический ответ; HTTP 200 не подтверждает наличие данных.
+        Формат ответа и ограничения — как у `/books/search`.
       parameters:
         - name: query
           in: query
@@ -260,9 +317,10 @@ paths:
             maximum: 50
       responses:
         "200":
-          description: Результаты поиска
+          description: Пустой объект вместо результатов; историческая схема сохранена ниже
           content:
             application/json:
+              example: {}
               schema:
                 type: object
                 properties:
@@ -281,9 +339,13 @@ paths:
       summary: Поиск серий
       tags: [Анонимные]
       security: []
+      deprecated: true
       x-verified-status: live
       x-verified-date: "2026-09-03"
       description: |
+        Устаревший REST-поиск возвращает HTTP 200 с `{}` вместо результатов.
+        Для рабочего поиска используйте `searchWebGraphQL`. Схема ниже
+        описывает исторический ответ; HTTP 200 не подтверждает наличие данных.
         Формат ответа и ограничения — как у `/books/search`. Схема `Series`
         не подтверждена — см. её описание.
       parameters:
@@ -305,9 +367,10 @@ paths:
             maximum: 50
       responses:
         "200":
-          description: Результаты поиска
+          description: Пустой объект вместо результатов; историческая схема сохранена ниже
           content:
             application/json:
+              example: {}
               schema:
                 type: object
                 properties:
@@ -326,9 +389,14 @@ paths:
       summary: Поиск авторов
       tags: [Анонимные]
       security: []
+      deprecated: true
       x-verified-status: live
       x-verified-date: "2026-09-03"
-      description: Формат ответа и ограничения — как у `/books/search`.
+      description: |
+        Устаревший REST-поиск возвращает HTTP 200 с `{}` вместо результатов.
+        Для рабочего поиска используйте `searchWebGraphQL`. Схема ниже
+        описывает исторический ответ; HTTP 200 не подтверждает наличие данных.
+        Формат ответа и ограничения — как у `/books/search`.
       parameters:
         - name: query
           in: query
@@ -348,9 +416,10 @@ paths:
             maximum: 50
       responses:
         "200":
-          description: Результаты поиска
+          description: Пустой объект вместо результатов; историческая схема сохранена ниже
           content:
             application/json:
+              example: {}
               schema:
                 type: object
                 properties:
@@ -369,9 +438,13 @@ paths:
       summary: Поиск сразу по всем секциям каталога
       tags: [Анонимные]
       security: []
+      deprecated: true
       x-verified-status: live
       x-verified-date: "2026-09-03"
       description: |
+        Устаревший REST-поиск возвращает HTTP 200 с `{}` вместо результатов.
+        Для рабочего поиска используйте `searchWebGraphQL`. Схема ниже
+        описывает исторический ответ; HTTP 200 не подтверждает наличие данных.
         `search` — объект с одним ключом на секцию (`books`, `audiobooks`,
         `comicbooks`, `series`, `authors`, `bookshelves`, `users`), форма
         секции — `{objects, meta}`, как у `/{resource}/search`. Кроме
@@ -384,9 +457,10 @@ paths:
             type: string
       responses:
         "200":
-          description: Результаты, обёрнутые в ключ `search`
+          description: Пустой объект вместо результатов; историческая схема сохранена ниже
           content:
             application/json:
+              example: {}
               schema:
                 type: object
                 properties:
@@ -2006,6 +2080,108 @@ components:
         type: integer
 
   schemas:
+    WebSearchRequest:
+      type: object
+      required: [operationName, query, variables]
+      properties:
+        operationName:
+          type: string
+          enum: [Search]
+        query:
+          type: string
+          description: Точный текст из examples/search.json; не редактировать
+        variables:
+          type: object
+          required: [search, cursor]
+          properties:
+            search:
+              type: string
+              description: Поисковая строка; кириллица передаётся в JSON как UTF-8
+            cursor:
+              type: string
+              default: ""
+              description: Пустая строка для начала; далее значение data.search.cursor без изменений
+            type:
+              type: string
+              nullable: true
+              enum: [TEXTBOOK, AUDIOBOOK, COMICBOOK, SERIES, AUTHOR, null]
+              description: Тип выдачи; null или отсутствие поля — смешанный поиск
+            noMisspell:
+              type: boolean
+              description: Отключить исправление поисковой строки
+
+    WebSearchResponse:
+      type: object
+      anyOf:
+        - required: [data]
+        - required: [errors]
+      properties:
+        data:
+          type: object
+          nullable: true
+          required: [search]
+          properties:
+            search:
+              type: object
+              nullable: true
+              required: [page, cursor]
+              properties:
+                cursor:
+                  type: string
+                  description: Курсор для следующего запроса; не вычислять из номера страницы
+                page:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/WebSearchItem"
+                misspell:
+                  type: object
+                  nullable: true
+                  properties:
+                    correctedText:
+                      type: string
+                    correctionType:
+                      type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              message:
+                type: string
+
+    WebSearchItem:
+      type: object
+      required: [__typename]
+      description: |
+        Поля зависят от __typename. TextBook/AudioBook/ComicBook содержат book;
+        Person (фильтр AUTHOR) содержит uuid/name непосредственно.
+        Это форма веб-поиска, не REST Book/Author.
+      properties:
+        __typename:
+          type: string
+          example: TextBook
+        uuid:
+          type: string
+        name:
+          type: string
+        book:
+          type: object
+          properties:
+            initUuid:
+              type: string
+              description: UUID карточки, пригодный для GET /books/{uuid}
+            name:
+              type: string
+            authors:
+              type: array
+              items:
+                type: object
+                properties:
+                  uuid:
+                    type: string
+                  name:
+                    type: string
+
     Error:
       type: object
       description: |
@@ -2857,8 +3033,9 @@ components:
 
 x-graphql:
   description: |
-    Не выражается в OpenAPI как path (одна операция POST с меняющимся
-    телом). Эндпоинт: POST https://api-gateway.bookmate.yandex.net/graphql,
+    Мобильные операции отдельно не формализованы как paths. Веб-поиск
+    описан в searchWebGraphQL выше. Мобильный эндпоинт:
+    POST https://api-gateway.bookmate.yandex.net/graphql,
     тело {"operationName", "variables", "query"}. Работает по вайтлисту
     операций — интроспекция и произвольные запросы отбиваются.
 
